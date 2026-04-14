@@ -118,7 +118,7 @@
 
         @media (min-width: 600px) {
             .patient-info { flex-direction: row; justify-content: space-between; flex-wrap: wrap; }
-            .patient-info div { width: 31%; } /* 調整寬度以容納三個欄位 */
+            .patient-info div { width: 31%; }
             .btn-group { flex-direction: row; justify-content: center; }
             button { width: auto; }
         }
@@ -236,7 +236,7 @@
     <div class="btn-group">
         <button class="btn-clear" onclick="clearData()">一鍵清除資料</button>
         <button class="btn-print" onclick="window.print()">預覽 / 列印 PDF</button>
-        <button class="btn-word" onclick="exportToWord()">匯出 Word 檔</button>
+        <button class="btn-word" onclick="exportToWord()">匯出 Word 檔 (窄邊界)</button>
     </div>
 </div>
 
@@ -245,13 +245,24 @@
     function getStatusString(sys, dia, hr) {
         let notes = [];
         
-        // 血壓判定
+        // 血壓判定：分離高低血壓判斷
         if (!isNaN(sys) && !isNaN(dia)) {
-            if (sys >= 140 || dia >= 90) notes.push("第二期高血壓");
-            else if (sys >= 130 || dia >= 80) notes.push("第一期高血壓");
-            else if (sys >= 120 && dia < 80) notes.push("血壓偏高");
-            else if (sys < 90 || dia < 60) notes.push("低血壓"); // 新增的低血壓判定
-            else notes.push("正常");
+            let isLow = (sys < 90 || dia < 60);
+            let stage = 0;
+            
+            // 判定高血壓等級
+            if (sys >= 140 || dia >= 90) stage = 3;
+            else if (sys >= 130 || dia >= 80) stage = 2;
+            else if (sys >= 120 && dia < 80) stage = 1;
+
+            if (stage === 3) notes.push("第二期高血壓");
+            else if (stage === 2) notes.push("第一期高血壓");
+            else if (stage === 1 && !isLow) notes.push("血壓偏高"); // 避免血壓偏高與低血壓同時出現造成混淆
+
+            // 獨立判定低血壓
+            if (isLow) notes.push("低血壓");
+
+            if (notes.length === 0) notes.push("正常");
         }
 
         // 心跳判定
@@ -265,7 +276,7 @@
 
     // 自動評估邏輯
     function evaluateBP() {
-        const age = parseInt(document.getElementById('patientAge').value) || 20; // 若未填寫年齡，預設為成人(20歲)
+        const age = parseInt(document.getElementById('patientAge').value) || 20;
 
         // 1. 處理一般血壓表
         const genRows = document.querySelectorAll('#generalTable tbody tr');
@@ -311,7 +322,7 @@
             // 姿勢性心搏過速(POTS)判定
             if (!isNaN(hr) && !isNaN(baseHr)) {
                 let hrDiff = hr - baseHr;
-                let hrLimit = (age < 19) ? 40 : 30; // 19歲以下標準不同
+                let hrLimit = (age < 19) ? 40 : 30;
                 if (hrDiff >= hrLimit) {
                     notes.push("⚠️疑似POTS(心跳異常增加)");
                 }
@@ -321,7 +332,6 @@
         }
     }
 
-    // 綁定所有 input 觸發計算
     document.querySelectorAll('.bp-input').forEach(input => {
         input.addEventListener('input', evaluateBP);
     });
