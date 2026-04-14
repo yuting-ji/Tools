@@ -67,7 +67,7 @@
             padding: 10px;
             text-align: center;
             vertical-align: middle;
-            white-space: nowrap;
+            white-space: nowrap; /* 網頁版維持不換行以保持整齊 */
         }
         th {
             background-color: #f8f9fa;
@@ -123,11 +123,37 @@
             button { width: auto; }
         }
 
+        /* --- PDF 與列印專用樣式區塊 --- */
         @media print {
             .btn-group { display: none; }
             body { background-color: #fff; padding: 0; }
             .container { box-shadow: none; padding: 0; max-width: 100%; }
-            input { border: none !important; }
+            input { border: none !important; background: transparent !important; }
+            
+            .table-responsive { overflow-x: visible; }
+            
+            /* 強制表格適應 A4 紙寬度，並允許文字換行 */
+            table {
+                table-layout: fixed;
+                width: 100%;
+                min-width: auto; /* 解除網頁版的最小寬度限制 */
+            }
+            th, td {
+                white-space: normal !important; /* 允許列印時換行 */
+                padding: 6px 2px; /* 稍微縮小內距爭取空間 */
+                word-wrap: break-word;
+            }
+            
+            /* 精準分配列印時的欄寬，把最大空間留給備註欄 */
+            th:nth-child(1), td:nth-child(1) { width: 22%; }
+            th:nth-child(2), td:nth-child(2) { width: 14%; }
+            th:nth-child(3), td:nth-child(3) { width: 14%; }
+            th:nth-child(4), td:nth-child(4) { width: 14%; }
+            th:nth-child(5), td:nth-child(5) { width: 36%; }
+            
+            .remark-input {
+                font-size: 11px !important; /* 縮小字體確保長提示能完整塞入格子 */
+            }
         }
     </style>
 </head>
@@ -327,7 +353,6 @@
             clonedInputs[i].parentNode.replaceChild(textNode, clonedInputs[i]);
         }
 
-        // Word 專用樣式：九宮格置中 (text-align + vertical-align) 與 行距/間距為 0
         const wordStyles = `
             <style>
                 @page Section1 {
