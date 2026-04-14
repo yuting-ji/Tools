@@ -3,11 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>綜合血壓與姿態性低血壓記錄</title>
+    <title>綜合血壓與姿態性低血壓記錄 (窄邊界版)</title>
     <style>
         /* 手機優先的基礎設定 */
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', '微軟正黑體', sans-serif;
             background-color: #f4f7f6;
             color: #333;
             line-height: 1.6;
@@ -59,7 +59,7 @@
             font-size: 0.9em;
         }
         
-        /* 表格響應式設定 (手機上可橫向滑動) */
+        /* 表格響應式設定 */
         .table-responsive {
             width: 100%;
             overflow-x: auto;
@@ -68,7 +68,7 @@
         }
         table {
             width: 100%;
-            min-width: 600px; /* 確保表格在縮小時不會擠在一起 */
+            min-width: 600px;
             border-collapse: collapse;
         }
         th, td {
@@ -83,7 +83,7 @@
             font-weight: 600;
         }
         
-        /* 輸入框針對手機優化：加大點擊範圍、防止iOS自動放大 */
+        /* 輸入框優化 */
         input[type="text"], input[type="number"], input[type="date"] {
             width: 95%;
             padding: 12px 8px;
@@ -94,13 +94,13 @@
         }
         .patient-info {
             display: flex;
-            flex-direction: column; /* 手機上直向排列 */
+            flex-direction: column;
             gap: 15px;
             margin-top: 20px;
             margin-bottom: 20px;
         }
         
-        /* 按鈕針對手機優化：直向排列滿版 */
+        /* 按鈕優化 */
         .btn-group {
             display: flex;
             flex-direction: column;
@@ -121,7 +121,6 @@
         .btn-print { background-color: #3498db; color: white; }
         .btn-word { background-color: #2ecc71; color: white; }
 
-        /* 電腦版大螢幕調整 */
         @media (min-width: 600px) {
             .patient-info { flex-direction: row; justify-content: space-between; }
             .patient-info div { width: 48%; }
@@ -129,18 +128,12 @@
             button { width: auto; }
         }
 
-        /* 列印與匯出時的乾淨排版 */
         @media print {
             .btn-group { display: none; }
             body { background-color: #fff; padding: 0; }
             .container { box-shadow: none; padding: 0; max-width: 100%; }
             .table-responsive { overflow-x: visible; }
-            input[type="text"], input[type="number"], input[type="date"] {
-                border: none;
-                background: transparent;
-                padding: 0;
-            }
-            .reference-box { border: 1px solid #000; border-left: 1px solid #000; }
+            input { border: none !important; }
         }
     </style>
 </head>
@@ -180,7 +173,7 @@
                     <th>收縮壓 (mmHg)</th>
                     <th>舒張壓 (mmHg)</th>
                     <th>心跳 (次/分)</th>
-                    <th>備註 (系統自動提示)</th>
+                    <th>備註 (系統提示)</th>
                 </tr>
             </thead>
             <tbody>
@@ -211,16 +204,16 @@
                     <th>收縮壓 (mmHg)</th>
                     <th>舒張壓 (mmHg)</th>
                     <th>心跳 (次/分)</th>
-                    <th>備註 (系統自動提示)</th>
+                    <th>備註 (系統提示)</th>
                 </tr>
             </thead>
             <tbody>
                 <tr>
-                    <td>平臥 (基準)</td>
+                    <td>平臥 (基準值)</td>
                     <td><input type="number" placeholder="數值" class="bp-input"></td>
                     <td><input type="number" placeholder="數值" class="bp-input"></td>
                     <td><input type="number" placeholder="數值"></td>
-                    <td><input type="text" placeholder="基準值" readonly style="background-color: #f9f9f9; color: #c0392b; font-weight: bold;"></td>
+                    <td><input type="text" placeholder="基準" readonly style="background-color: #f9f9f9; color: #c0392b; font-weight: bold;"></td>
                 </tr>
                 <tr>
                     <td>坐起 2 分鐘後</td>
@@ -243,49 +236,32 @@
     <div class="btn-group">
         <button class="btn-clear" onclick="clearData()">一鍵清除資料</button>
         <button class="btn-print" onclick="window.print()">預覽 / 列印 PDF</button>
-        <button class="btn-word" onclick="exportToWord()">匯出 Word 檔</button>
+        <button class="btn-word" onclick="exportToWord()">匯出 Word 檔 (窄邊界)</button>
     </div>
 </div>
 
 <script>
-    // 自動評估血壓並寫入備註欄的邏輯
+    // 自動評估邏輯
     function evaluateBP() {
-        // 1. 處理一般血壓表
         const genRows = document.querySelectorAll('#generalTable tbody tr');
         genRows.forEach(row => {
             const inputs = row.querySelectorAll('input');
             const sys = parseInt(inputs[1].value);
             const dia = parseInt(inputs[2].value);
             const remark = inputs[4];
-            
             if (!isNaN(sys) && !isNaN(dia)) {
                 if (sys >= 140 || dia >= 90) remark.value = "第二期高血壓";
                 else if (sys >= 130 || dia >= 80) remark.value = "第一期高血壓";
                 else if (sys >= 120 && dia < 80) remark.value = "血壓偏高";
                 else remark.value = "正常";
-            } else {
-                remark.value = "";
-            }
+            } else { remark.value = ""; }
         });
 
-        // 2. 處理姿態性低血壓表
         const orthoRows = document.querySelectorAll('#orthostaticTable tbody tr');
         const baseSys = parseInt(orthoRows[0].querySelectorAll('input')[0].value);
         const baseDia = parseInt(orthoRows[0].querySelectorAll('input')[1].value);
-        const baseRemark = orthoRows[0].querySelectorAll('input')[3];
         
-        // 先計算平臥基準值的正常與否
-        if(!isNaN(baseSys) && !isNaN(baseDia)){
-            if (baseSys >= 140 || baseDia >= 90) baseRemark.value = "第二期高血壓";
-            else if (baseSys >= 130 || baseDia >= 80) baseRemark.value = "第一期高血壓";
-            else if (baseSys >= 120 && baseDia < 80) baseRemark.value = "血壓偏高";
-            else baseRemark.value = "正常";
-        } else {
-            baseRemark.value = "";
-        }
-
-        // 計算坐起與站立的值
-        for(let i = 1; i < orthoRows.length; i++) {
+        for(let i = 0; i < orthoRows.length; i++) {
             const inputs = orthoRows[i].querySelectorAll('input');
             const sys = parseInt(inputs[0].value);
             const dia = parseInt(inputs[1].value);
@@ -293,79 +269,84 @@
 
             if (!isNaN(sys) && !isNaN(dia)) {
                 let notes = [];
-                // 基礎血壓判定
                 if (sys >= 140 || dia >= 90) notes.push("第二期高血壓");
                 else if (sys >= 130 || dia >= 80) notes.push("第一期高血壓");
                 else if (sys >= 120 && dia < 80) notes.push("血壓偏高");
                 else notes.push("正常");
 
-                // 姿態性低血壓判定 (比對平臥值)
-                if (!isNaN(baseSys) && !isNaN(baseDia)) {
+                if (i > 0 && !isNaN(baseSys) && !isNaN(baseDia)) {
                     if ((baseSys - sys) >= 20 || (baseDia - dia) >= 10) {
                         notes.push("⚠️疑似姿態性低血壓");
                     }
                 }
                 remark.value = notes.join(" / ");
-            } else {
-                remark.value = "";
-            }
+            } else { remark.value = ""; }
         }
     }
 
-    // 監聽所有寫入血壓數值的動作，觸發運算
     document.querySelectorAll('.bp-input').forEach(input => {
         input.addEventListener('input', evaluateBP);
     });
 
-    // 一鍵清除資料
     function clearData() {
-        const inputs = document.querySelectorAll('input');
-        inputs.forEach(input => {
-            input.value = '';
-        });
+        if(confirm("確定要清除所有填寫的資料嗎？")) {
+            document.querySelectorAll('input').forEach(input => input.value = '');
+        }
     }
 
-    // 取得當前時間用於動態檔名
     function getFormattedTimestamp() {
         const now = new Date();
         const pad = n => n.toString().padStart(2, '0');
         return `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}_${pad(now.getHours())}${pad(now.getMinutes())}`;
     }
 
-    // 匯出 Word 檔功能
     function exportToWord() {
         const exportArea = document.getElementById('export-area');
         const clone = exportArea.cloneNode(true);
         
-        // 移除按鈕
         const btnGroup = clone.querySelector('.btn-group');
         if (btnGroup) btnGroup.remove();
 
-        // 將 Input 轉換為純文字
         const originalInputs = exportArea.querySelectorAll('input');
         const clonedInputs = clone.querySelectorAll('input');
-        
         for (let i = 0; i < originalInputs.length; i++) {
             const val = originalInputs[i].value;
             const textNode = document.createTextNode(val || ' ');
             clonedInputs[i].parentNode.replaceChild(textNode, clonedInputs[i]);
         }
 
-        // 加入行內樣式確保 Word 讀取正確
-        const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>綜合血壓記錄</title><style>body { font-family: '微軟正黑體', sans-serif; } table { border-collapse: collapse; width: 100%; margin-bottom: 20px; } th, td { border: 1px solid black; padding: 8px; text-align: center; } .reference-box { border: 1px solid #3498db; padding: 10px; background-color: #e8f4f8; margin-bottom: 20px; } .section-title { background-color: #eafaf1; padding: 5px; }</style></head><body>";
-        const footer = "</body></html>";
+        // Word 窄邊界 CSS 設定 (0.5 inch = 36pt)
+        const wordStyles = `
+            <style>
+                @page Section1 {
+                    size: 8.5in 11.0in;
+                    margin: 0.5in 0.5in 0.5in 0.5in;
+                    mso-header-margin: 0.5in;
+                    mso-footer-margin: 0.5in;
+                    mso-paper-source: 0;
+                }
+                div.Section1 { page: Section1; }
+                body { font-family: '微軟正黑體', sans-serif; }
+                table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
+                th, td { border: 1px solid black; padding: 8px; text-align: center; }
+                .reference-box { border: 1px solid #3498db; padding: 10px; background-color: #e8f4f8; margin-bottom: 20px; }
+                .section-title { background-color: #eafaf1; padding: 5px; font-weight: bold; }
+                .main-title { text-align: center; }
+            </style>
+        `;
+
+        const header = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>血壓記錄</title>${wordStyles}</head><body><div class="Section1">`;
+        const footer = "</div></body></html>";
         const htmlString = header + clone.innerHTML + footer;
 
-        // 建立並下載檔案 (檔名加上時間)
         const blob = new Blob(['\ufeff', htmlString], { type: 'application/msword' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
         const timestamp = getFormattedTimestamp();
-        link.download = `綜合血壓與姿態性檢測記錄_${timestamp}.doc`;
+        link.download = `綜合血壓記錄_${timestamp}.doc`;
         document.body.appendChild(link);
         link.click();
-        
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
     }
