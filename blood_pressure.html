@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>綜合血壓與姿態性低血壓記錄</title>
+    <title>綜合血壓記錄</title>
     <style>
         body {
             font-family: 'Segoe UI', '標楷體', sans-serif;
@@ -46,17 +46,11 @@
             margin-bottom: 20px;
             border-radius: 4px;
         }
-        .reference-box h4 {
-            margin-top: 0;
-            margin-bottom: 10px;
-            color: #2980b9;
-        }
         .reference-box ul {
             margin: 0;
             padding-left: 20px;
             font-size: 0.9em;
         }
-        
         .table-responsive {
             width: 100%;
             overflow-x: auto;
@@ -72,14 +66,13 @@
             border: 1px solid #ddd;
             padding: 10px;
             text-align: center;
+            vertical-align: middle;
             white-space: nowrap;
         }
         th {
             background-color: #f8f9fa;
             color: #2c3e50;
-            font-weight: 600;
         }
-        
         input[type="text"], input[type="number"], input[type="date"] {
             width: 95%;
             padding: 12px 8px;
@@ -87,13 +80,14 @@
             border: 1px solid #ccc;
             border-radius: 4px;
             box-sizing: border-box;
+            text-align: center;
         }
         .remark-input {
             background-color: #f9f9f9; 
             color: #c0392b; 
             font-weight: bold; 
             width: 100%;
-            font-size: 14px !important; /* 縮小字體避免長文字被切斷 */
+            font-size: 14px !important;
         }
         .patient-info {
             display: flex;
@@ -102,7 +96,6 @@
             margin-top: 20px;
             margin-bottom: 20px;
         }
-        
         .btn-group {
             display: flex;
             flex-direction: column;
@@ -134,7 +127,6 @@
             .btn-group { display: none; }
             body { background-color: #fff; padding: 0; }
             .container { box-shadow: none; padding: 0; max-width: 100%; }
-            .table-responsive { overflow-x: visible; }
             input { border: none !important; }
         }
     </style>
@@ -142,32 +134,30 @@
 <body>
 
 <div class="container" id="export-area">
-    <h2 class="main-title" style="text-align: center; color: #2c3e50;">綜合血壓與姿態性檢測記錄表</h2>
+    <h2 class="main-title" style="text-align: center;">綜合血壓與姿態性檢測記錄表</h2>
     
     <div class="reference-box">
         <h4>💡 生理數值參考範圍</h4>
         <ul>
-            <li><strong>正常血壓：</strong> 收縮壓 90-120 且 舒張壓 60-80</li>
-            <li><strong>血壓偏高：</strong> 收縮壓 121-129 且 舒張壓 ≤ 80</li>
-            <li><strong>高血壓標準：</strong> 收縮壓 ≥ 130 或 舒張壓 > 80</li>
-            <li><strong>低血壓：</strong> 收縮壓 < 90 (若收縮壓正常，僅舒張壓略低無不適則視為正常)</li>
-            <li><strong>正常心跳：</strong> 60-100 次/分 (安靜狀態)</li>
-            <li style="color: #c0392b; margin-top: 5px;"><strong>* 姿態性低血壓 (OH)：</strong> 站立後收縮壓下降 ≥ 20，或舒張壓下降 ≥ 10</li>
-            <li style="color: #c0392b;"><strong>* 姿勢性心搏過速 (POTS)：</strong> 站立後心跳增加 ≥ 30 次/分 (19歲以下增加 ≥ 40 次/分)</li>
+            <li>正常血壓：收縮壓 90-120 且 舒張壓 60-80</li>
+            <li>血壓偏高：收縮壓 121-129 且 舒張壓 ≤ 80</li>
+            <li>高血壓標準：收縮壓 ≥ 130 或 舒張壓 > 80</li>
+            <li>低血壓：收縮壓 < 90</li>
+            <li>正常心跳：60-100 次/分</li>
         </ul>
     </div>
 
     <div class="patient-info">
         <div>
-            <label for="patientName">姓名：</label>
+            <label>姓名：</label>
             <input type="text" id="patientName" placeholder="請輸入姓名">
         </div>
         <div>
-            <label for="patientAge">年齡：</label>
+            <label>年齡：</label>
             <input type="number" id="patientAge" placeholder="請輸入年齡" class="bp-input">
         </div>
         <div>
-            <label for="recordDate">檢測日期：</label>
+            <label>檢測日期：</label>
             <input type="date" id="recordDate">
         </div>
     </div>
@@ -249,45 +239,26 @@
 </div>
 
 <script>
-    // 取得血壓與心跳的單行評估字串
     function getStatusString(sys, dia, hr) {
         let notes = [];
-        
-        // 1. 血壓判定：使用最高風險覆蓋法，解決高低血壓同時出現的矛盾
         if (!isNaN(sys) && !isNaN(dia)) {
             let bpStatus = "";
-            
-            if (sys >= 140 || dia >= 90) {
-                bpStatus = "第二期高血壓";
-            } else if (sys >= 130 || dia > 80) { // 大眾認知 80 為正常
-                bpStatus = "第一期高血壓";
-            } else if (sys > 120 && dia <= 80) { // 大眾認知 120 為正常
-                bpStatus = "血壓偏高";
-            } else if (sys < 90) {
-                // 真正具備臨床危險性的低血壓通常是收縮壓 < 90
-                bpStatus = "低血壓";
-            } else {
-                // 剩餘區間 (包含 90~120 且 舒張壓 < 80，即使舒張壓掉到 59 也不亂叫)
-                bpStatus = "正常";
-            }
-            
+            if (sys >= 140 || dia >= 90) bpStatus = "第二期高血壓";
+            else if (sys >= 130 || dia > 80) bpStatus = "第一期高血壓";
+            else if (sys > 120 && dia <= 80) bpStatus = "血壓偏高";
+            else if (sys < 90) bpStatus = "低血壓";
+            else bpStatus = "正常";
             notes.push(bpStatus);
         }
-
-        // 2. 心跳判定
         if (!isNaN(hr)) {
             if (hr < 60) notes.push("心跳過緩");
             else if (hr > 100) notes.push("心跳過快");
         }
-
         return notes;
     }
 
-    // 自動評估邏輯
     function evaluateBP() {
         const age = parseInt(document.getElementById('patientAge').value) || 20;
-
-        // 處理一般血壓表
         const genRows = document.querySelectorAll('#generalTable tbody tr');
         genRows.forEach(row => {
             const inputs = row.querySelectorAll('input');
@@ -295,48 +266,33 @@
             const dia = parseInt(inputs[2].value);
             const hr = parseInt(inputs[3].value);
             const remark = inputs[4];
-            
             let notes = getStatusString(sys, dia, hr);
             remark.value = notes.length > 0 ? notes.join(" / ") : "";
         });
 
-        // 處理姿態性血壓表
         const orthoRows = document.querySelectorAll('#orthostaticTable tbody tr');
         const baseSys = parseInt(orthoRows[0].querySelectorAll('input')[0].value);
         const baseDia = parseInt(orthoRows[0].querySelectorAll('input')[1].value);
         const baseHr = parseInt(orthoRows[0].querySelectorAll('input')[2].value);
         const baseRemark = orthoRows[0].querySelectorAll('input')[3];
-        
-        // 基準值判定
         let baseNotes = getStatusString(baseSys, baseDia, baseHr);
         baseRemark.value = baseNotes.length > 0 ? baseNotes.join(" / ") : "";
 
-        // 坐起與站立判定
         for(let i = 1; i < orthoRows.length; i++) {
             const inputs = orthoRows[i].querySelectorAll('input');
             const sys = parseInt(inputs[0].value);
             const dia = parseInt(inputs[1].value);
             const hr = parseInt(inputs[2].value);
             const remark = inputs[3];
-
             let notes = getStatusString(sys, dia, hr);
-
-            // 姿態性低血壓判定
             if (!isNaN(sys) && !isNaN(dia) && !isNaN(baseSys) && !isNaN(baseDia)) {
-                if ((baseSys - sys) >= 20 || (baseDia - dia) >= 10) {
-                    notes.push("⚠️疑似姿態性");
-                }
+                if ((baseSys - sys) >= 20 || (baseDia - dia) >= 10) notes.push("⚠️疑似姿態性");
             }
-
-            // 姿勢性心搏過速(POTS)判定
             if (!isNaN(hr) && !isNaN(baseHr)) {
                 let hrDiff = hr - baseHr;
                 let hrLimit = (age < 19) ? 40 : 30;
-                if (hrDiff >= hrLimit) {
-                    notes.push("⚠️疑似POTS");
-                }
+                if (hrDiff >= hrLimit) notes.push("⚠️疑似POTS");
             }
-
             remark.value = notes.length > 0 ? notes.join(" / ") : "";
         }
     }
@@ -360,7 +316,6 @@
     function exportToWord() {
         const exportArea = document.getElementById('export-area');
         const clone = exportArea.cloneNode(true);
-        
         const btnGroup = clone.querySelector('.btn-group');
         if (btnGroup) btnGroup.remove();
 
@@ -372,6 +327,7 @@
             clonedInputs[i].parentNode.replaceChild(textNode, clonedInputs[i]);
         }
 
+        // Word 專用樣式：九宮格置中 (text-align + vertical-align) 與 行距/間距為 0
         const wordStyles = `
             <style>
                 @page Section1 {
@@ -379,15 +335,23 @@
                     margin: 0.5in 0.5in 0.5in 0.5in;
                     mso-header-margin: 0.5in;
                     mso-footer-margin: 0.5in;
-                    mso-paper-source: 0;
                 }
                 div.Section1 { page: Section1; }
                 body { font-family: '標楷體', sans-serif; }
-                table { border-collapse: collapse; width: 100%; margin-bottom: 20px; }
-                th, td { border: 1px solid black; padding: 8px; text-align: center; }
-                .reference-box { border: 1px solid #3498db; padding: 10px; background-color: #e8f4f8; margin-bottom: 20px; }
-                .section-title { background-color: #eafaf1; padding: 5px; font-weight: bold; }
-                .main-title { text-align: center; }
+                h2, h3 { text-align: center; }
+                table { border-collapse: collapse; width: 100%; mso-table-lspace:0pt; mso-table-rspace:0pt; }
+                th, td { 
+                    border: 1px solid black; 
+                    padding: 4px; 
+                    text-align: center; 
+                    vertical-align: middle; 
+                    mso-vertical-align-alt: middle;
+                    line-height: 1.0; 
+                    mso-line-height-rule: exactly;
+                }
+                p, div { margin: 0; padding: 0; line-height: 1.0; }
+                .reference-box { border: 1px solid #3498db; padding: 10px; margin-bottom: 20px; }
+                .section-title { background-color: #eafaf1; font-weight: bold; }
             </style>
         `;
 
@@ -400,7 +364,7 @@
         const link = document.createElement('a');
         link.href = url;
         const timestamp = getFormattedTimestamp();
-        link.download = `綜合血壓記錄_${timestamp}.doc`;
+        link.download = `血壓記錄_${timestamp}.doc`;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
