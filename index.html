@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>網站入口</title>
+    <style>
+        /* --- 基礎版面設定 --- */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        body {
+            /* 使用乾淨的無襯線字體，並設定一個柔和的淺灰藍色背景 */
+            font-family: "Helvetica Neue", Helvetica, Arial, "PingFang TC", "微軟正黑體", sans-serif;
+            background-color: #f4f7f6; 
+            color: #333;
+            /* 使用 Flexbox 讓內容在畫面上垂直與水平置中 */
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+        }
+
+        /* --- 中央卡片設計 --- */
+        .container {
+            background-color: #ffffff;
+            width: 90%; /* 在手機上佔滿 90% 寬度 */
+            max-width: 400px; /* 在電腦上最寬不超過 400px，保持精緻感 */
+            padding: 40px 30px;
+            border-radius: 12px; /* 圓角邊框 */
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05); /* 非常輕微的立體陰影，不浮誇 */
+            text-align: center;
+        }
+
+        /* --- 文字排版 --- */
+        h1 {
+            font-size: 24px;
+            color: #2c3e50;
+            margin-bottom: 8px;
+        }
+        p.subtitle {
+            font-size: 14px;
+            color: #7f8c8d;
+            margin-bottom: 30px;
+        }
+
+        /* --- 按鈕區域設定 --- */
+        .button-group {
+            display: flex;
+            flex-direction: column; /* 讓按鈕由上往下直式排列 */
+            gap: 15px; /* 按鈕之間的間距 */
+        }
+
+        /* --- 按鈕本體設計 --- */
+        .nav-btn {
+            display: block;
+            width: 100%;
+            padding: 16px;
+            background-color: #3498db; /* 專業沉穩的藍色 */
+            color: #ffffff;
+            text-decoration: none; /* 去除超連結的底線 */
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 8px; /* 按鈕小圓角 */
+            transition: background-color 0.3s ease, transform 0.2s ease; /* 讓滑鼠互動有滑順的動畫 */
+        }
+
+        /* 按鈕互動效果：滑鼠移過去時變深色並微幅上浮 */
+        .nav-btn:hover {
+            background-color: #2980b9;
+            transform: translateY(-2px);
+        }
+        /* 按鈕互動效果：點擊時恢復原位 */
+        .nav-btn:active {
+            transform: translateY(0);
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1>小工具導覽</h1>
+        <p class="subtitle">請點擊下方按鈕前往各頁面</p>
+        
+        <div class="button-group">
+            <a href="blood_pressure.html" class="nav-btn">血壓/心跳量測紀錄</a>
+            <a href="建置中.html" class="nav-btn">建置中</a>
+            <a href="建置中.html" class="nav-btn">建置中</a>
+            <a href="建置中.html" class="nav-btn">建置中</a>
+            <a href="建置中.html" class="nav-btn">建置中</a>
+            <a href="建置中.html" class="nav-btn">建置中</a>
+        </div>
+    </div>
+
+</body>
+</html>
