@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>綜合血壓與姿態性低血壓記錄</title>
+    <title>綜合血壓與姿態性檢測記錄 (自動日期檔名版)</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -112,7 +112,6 @@
                 background: transparent;
                 padding: 0;
             }
-            .reference-box { border: 1px solid #000; border-left: 1px solid #000; }
         }
     </style>
 </head>
@@ -124,11 +123,11 @@
     <div class="reference-box">
         <h4>💡 成人血壓參考範圍 (依據台灣心臟學會指引)</h4>
         <ul>
-            <li><strong>正常血壓：</strong> 收縮壓 &lt; 120 mmHg 且 舒張壓 &lt; 80 mmHg</li>
-            <li><strong>血壓偏高：</strong> 收縮壓 120-129 mmHg 且 舒張壓 &lt; 80 mmHg</li>
-            <li><strong>第一期高血壓：</strong> 收縮壓 130-139 mmHg 或 舒張壓 80-89 mmHg</li>
-            <li><strong>第二期高血壓：</strong> 收縮壓 ≥ 140 mmHg 或 舒張壓 ≥ 90 mmHg</li>
-            <li style="color: #c0392b; margin-top: 5px;"><strong>* 姿態性低血壓判定：</strong> 站立後收縮壓下降 ≥ 20 mmHg，或舒張壓下降 ≥ 10 mmHg。</li>
+            <li>正常血壓： 收縮壓 < 120 mmHg 且 舒張壓 < 80 mmHg</li>
+            <li>血壓偏高： 收縮壓 120-129 mmHg 且 舒張壓 < 80 mmHg</li>
+            <li>第一期高血壓： 收縮壓 130-139 mmHg 或 舒張壓 80-89 mmHg</li>
+            <li>第二期高血壓： 收縮壓 ≥ 140 mmHg 或 舒張壓 ≥ 90 mmHg</li>
+            <li style="color: #c0392b; margin-top: 5px;">* 姿態性低血壓判定： 站立後收縮壓下降 ≥ 20 mmHg，或舒張壓下降 ≥ 10 mmHg。</li>
         </ul>
     </div>
 
@@ -164,13 +163,6 @@
             </tr>
             <tr>
                 <td><input type="text" placeholder="例如: 晚上 20:00"></td>
-                <td><input type="number" placeholder="數值"></td>
-                <td><input type="number" placeholder="數值"></td>
-                <td><input type="number" placeholder="數值"></td>
-                <td><input type="text" placeholder="無"></td>
-            </tr>
-            <tr>
-                <td><input type="text" placeholder="其他時間"></td>
                 <td><input type="number" placeholder="數值"></td>
                 <td><input type="number" placeholder="數值"></td>
                 <td><input type="number" placeholder="數值"></td>
@@ -224,10 +216,12 @@
 
 <script>
     function clearData() {
-        const inputs = document.querySelectorAll('input');
-        inputs.forEach(input => {
-            input.value = '';
-        });
+        if(confirm("確定要清除所有已填寫的資料嗎？")) {
+            const inputs = document.querySelectorAll('input');
+            inputs.forEach(input => {
+                input.value = '';
+            });
+        }
     }
 
     function exportToWord() {
@@ -235,9 +229,7 @@
         const clone = exportArea.cloneNode(true);
         
         const btnGroup = clone.querySelector('.btn-group');
-        if (btnGroup) {
-            btnGroup.remove();
-        }
+        if (btnGroup) { btnGroup.remove(); }
 
         const originalInputs = exportArea.querySelectorAll('input');
         const clonedInputs = clone.querySelectorAll('input');
@@ -248,18 +240,26 @@
             clonedInputs[i].parentNode.replaceChild(textNode, clonedInputs[i]);
         }
 
-        // 加上基礎的 CSS 讓 Word 讀取時版面不會跑掉
-        const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>綜合血壓記錄</title><style>table { border-collapse: collapse; width: 100%; margin-bottom: 20px; } th, td { border: 1px solid black; padding: 8px; text-align: center; font-family: '微軟正黑體', sans-serif; } .reference-box { border: 1px solid #3498db; padding: 10px; background-color: #e8f4f8; margin-bottom: 20px; } .section-title { background-color: #eafaf1; padding: 5px; }</style></head><body>";
+        // --- 產生日期時間檔名邏輯 ---
+        const now = new Date();
+        const y = now.getFullYear();
+        const m = String(now.getMonth() + 1).padStart(2, '0');
+        const d = String(now.getDate()).padStart(2, '0');
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        const timestamp = `${y}${m}${d}_${hh}${mm}${ss}`;
+        const fileName = `綜合血壓檢測記錄_${timestamp}.doc`;
+
+        const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><style>table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid black; padding: 8px; text-align: center; font-family: '微軟正黑體', sans-serif; } .reference-box { border: 1px solid #3498db; padding: 10px; background-color: #e8f4f8; margin-bottom: 20px; } .section-title { background-color: #eafaf1; padding: 5px; font-weight: bold; }</style></head><body>";
         const footer = "</body></html>";
         const htmlString = header + clone.innerHTML + footer;
 
-        const blob = new Blob(['\ufeff', htmlString], {
-            type: 'application/msword'
-        });
+        const blob = new Blob(['\ufeff', htmlString], { type: 'application/msword' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = '綜合血壓與姿態性檢測記錄.doc';
+        link.download = fileName;
         document.body.appendChild(link);
         link.click();
         
