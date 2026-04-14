@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>姿態性低血壓檢測記錄</title>
+    <title>綜合血壓與姿態性低血壓記錄</title>
     <style>
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
@@ -13,7 +13,7 @@
             padding: 20px;
         }
         .container {
-            max-width: 800px;
+            max-width: 850px;
             margin: 0 auto;
             background: #fff;
             padding: 30px;
@@ -23,25 +23,52 @@
         h2 {
             text-align: center;
             color: #2c3e50;
-            border-bottom: 2px solid #008000; /* 國泰綠色系 */
+            border-bottom: 2px solid #008000;
             padding-bottom: 10px;
+        }
+        .section-title {
+            background-color: #eafaf1;
+            border-left: 5px solid #2ecc71;
+            padding: 10px 15px;
+            margin-top: 30px;
+            color: #27ae60;
+            border-radius: 0 4px 4px 0;
+        }
+        .reference-box {
+            background-color: #e8f4f8;
+            border: 1px solid #bde0fe;
+            border-left: 5px solid #3498db;
+            padding: 15px;
+            margin-bottom: 20px;
+            border-radius: 4px;
+        }
+        .reference-box h4 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: #2980b9;
+        }
+        .reference-box ul {
+            margin: 0;
+            padding-left: 20px;
+            font-size: 0.95em;
         }
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 20px;
+            margin-top: 15px;
         }
         th, td {
             border: 1px solid #ddd;
-            padding: 12px;
+            padding: 10px;
             text-align: center;
         }
         th {
             background-color: #f8f9fa;
             color: #2c3e50;
+            font-weight: 600;
         }
         input[type="text"], input[type="number"], input[type="date"] {
-            width: 90%;
+            width: 95%;
             padding: 8px;
             border: 1px solid #ccc;
             border-radius: 4px;
@@ -51,6 +78,7 @@
             display: flex;
             justify-content: space-between;
             margin-bottom: 20px;
+            margin-top: 20px;
         }
         .patient-info div {
             width: 48%;
@@ -75,23 +103,35 @@
         .btn-word { background-color: #2ecc71; color: white; }
         .btn-word:hover { background-color: #27ae60; }
 
-        /* 列印時隱藏按鈕與優化版面，確保印出來或轉PDF時畫面乾淨 */
         @media print {
             .btn-group { display: none; }
-            body { background-color: #fff; }
-            .container { box-shadow: none; padding: 0; }
+            body { background-color: #fff; padding: 0; }
+            .container { box-shadow: none; padding: 0; max-width: 100%; }
             input[type="text"], input[type="number"], input[type="date"] {
                 border: none;
                 background: transparent;
+                padding: 0;
             }
+            .reference-box { border: 1px solid #000; border-left: 1px solid #000; }
         }
     </style>
 </head>
 <body>
 
 <div class="container" id="export-area">
-    <h2>姿態性低血壓檢測記錄表</h2>
+    <h2>綜合血壓與姿態性檢測記錄表</h2>
     
+    <div class="reference-box">
+        <h4>💡 成人血壓參考範圍 (依據台灣心臟學會指引)</h4>
+        <ul>
+            <li><strong>正常血壓：</strong> 收縮壓 &lt; 120 mmHg 且 舒張壓 &lt; 80 mmHg</li>
+            <li><strong>血壓偏高：</strong> 收縮壓 120-129 mmHg 且 舒張壓 &lt; 80 mmHg</li>
+            <li><strong>第一期高血壓：</strong> 收縮壓 130-139 mmHg 或 舒張壓 80-89 mmHg</li>
+            <li><strong>第二期高血壓：</strong> 收縮壓 ≥ 140 mmHg 或 舒張壓 ≥ 90 mmHg</li>
+            <li style="color: #c0392b; margin-top: 5px;"><strong>* 姿態性低血壓判定：</strong> 站立後收縮壓下降 ≥ 20 mmHg，或舒張壓下降 ≥ 10 mmHg。</li>
+        </ul>
+    </div>
+
     <div class="patient-info">
         <div>
             <label for="patientName">姓名：</label>
@@ -103,7 +143,44 @@
         </div>
     </div>
 
-    <table id="recordTable">
+    <h3 class="section-title">一、一般血壓記錄</h3>
+    <table id="generalTable">
+        <thead>
+            <tr>
+                <th>測量時間 (早/晚)</th>
+                <th>收縮壓 (mmHg)</th>
+                <th>舒張壓 (mmHg)</th>
+                <th>心跳 (次/分)</th>
+                <th>備註</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><input type="text" placeholder="例如: 早上 08:00"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="text" placeholder="無"></td>
+            </tr>
+            <tr>
+                <td><input type="text" placeholder="例如: 晚上 20:00"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="text" placeholder="無"></td>
+            </tr>
+            <tr>
+                <td><input type="text" placeholder="其他時間"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="text" placeholder="無"></td>
+            </tr>
+        </tbody>
+    </table>
+
+    <h3 class="section-title">二、姿態性低血壓檢測記錄</h3>
+    <table id="orthostaticTable">
         <thead>
             <tr>
                 <th>測量姿勢與時間</th>
@@ -116,24 +193,24 @@
         <tbody>
             <tr>
                 <td>平臥 (臥姿)</td>
-                <td><input type="number" class="data-input" placeholder="數值"></td>
-                <td><input type="number" class="data-input" placeholder="數值"></td>
-                <td><input type="number" class="data-input" placeholder="數值"></td>
-                <td><input type="text" class="data-input" placeholder="無"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="text" placeholder="無"></td>
             </tr>
             <tr>
                 <td>坐起 2 分鐘後</td>
-                <td><input type="number" class="data-input" placeholder="數值"></td>
-                <td><input type="number" class="data-input" placeholder="數值"></td>
-                <td><input type="number" class="data-input" placeholder="數值"></td>
-                <td><input type="text" class="data-input" placeholder="無"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="text" placeholder="無"></td>
             </tr>
             <tr>
                 <td>站立 2 分鐘後</td>
-                <td><input type="number" class="data-input" placeholder="數值"></td>
-                <td><input type="number" class="data-input" placeholder="數值"></td>
-                <td><input type="number" class="data-input" placeholder="數值"></td>
-                <td><input type="text" class="data-input" placeholder="無"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="number" placeholder="數值"></td>
+                <td><input type="text" placeholder="無"></td>
             </tr>
         </tbody>
     </table>
@@ -146,7 +223,6 @@
 </div>
 
 <script>
-    // 一鍵清除功能：抓取畫面上所有的 input 標籤，並將裡面的值清空
     function clearData() {
         const inputs = document.querySelectorAll('input');
         inputs.forEach(input => {
@@ -154,46 +230,39 @@
         });
     }
 
-    // 匯出 Word 檔功能：利用純前端技術將 HTML 表格轉換為 Word 可讀取的格式
     function exportToWord() {
         const exportArea = document.getElementById('export-area');
-        // 複製一份 DOM 節點，避免修改到使用者目前正在看的畫面
         const clone = exportArea.cloneNode(true);
         
-        // 移除複製節點中的按鈕區塊，因為 Word 檔裡不需要按鈕
         const btnGroup = clone.querySelector('.btn-group');
         if (btnGroup) {
             btnGroup.remove();
         }
 
-        // 將 input 輸入框轉換成純文字，讓 Word 能夠正確顯示填寫的數字，而不是空白的輸入框
         const originalInputs = exportArea.querySelectorAll('input');
         const clonedInputs = clone.querySelectorAll('input');
         
         for (let i = 0; i < originalInputs.length; i++) {
             const val = originalInputs[i].value;
-            // 如果有填值就顯示值，沒填就給個空白字元維持排版
             const textNode = document.createTextNode(val || ' ');
             clonedInputs[i].parentNode.replaceChild(textNode, clonedInputs[i]);
         }
 
-        // 組合 Word 支援的 HTML 格式開頭與結尾
-        const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>血壓記錄</title><style>table { border-collapse: collapse; width: 100%; } th, td { border: 1px solid black; padding: 8px; text-align: center; font-family: '微軟正黑體', sans-serif; }</style></head><body>";
+        // 加上基礎的 CSS 讓 Word 讀取時版面不會跑掉
+        const header = "<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>綜合血壓記錄</title><style>table { border-collapse: collapse; width: 100%; margin-bottom: 20px; } th, td { border: 1px solid black; padding: 8px; text-align: center; font-family: '微軟正黑體', sans-serif; } .reference-box { border: 1px solid #3498db; padding: 10px; background-color: #e8f4f8; margin-bottom: 20px; } .section-title { background-color: #eafaf1; padding: 5px; }</style></head><body>";
         const footer = "</body></html>";
         const htmlString = header + clone.innerHTML + footer;
 
-        // 建立 Blob 物件觸發下載 (MIME type 設定為 msword)
         const blob = new Blob(['\ufeff', htmlString], {
             type: 'application/msword'
         });
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
-        link.download = '姿態性低血壓檢測記錄.doc';
+        link.download = '綜合血壓與姿態性檢測記錄.doc';
         document.body.appendChild(link);
         link.click();
         
-        // 清理記憶體，移除剛剛建立的隱藏下載連結
         document.body.removeChild(link);
         URL.revokeObjectURL(url);
     }
