@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>台股殖利率估價計算機</title>
+    <style>
+        body {
+            font-family: "Microsoft JhengHei", "PingFang TC", sans-serif;
+            background-color: #f4f7f6;
+            color: #333;
+            line-height: 1.6;
+            padding: 20px;
+            display: flex;
+            justify-content: center;
+        }
+        .container {
+            background-color: #fff;
+            max-width: 600px;
+            width: 100%;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: #2c3e50;
+            margin-bottom: 20px;
+        }
+        /* 頁籤設計 */
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .tab-btn {
+            flex: 1;
+            padding: 12px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            font-weight: bold;
+            color: #7f8c8d;
+            transition: all 0.3s;
+        }
+        .tab-btn.active {
+            color: #2980b9;
+            border-bottom: 3px solid #2980b9;
+        }
+        .tab-content {
+            display: none;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        /* 輸入區塊 */
+        .input-group {
+            margin-bottom: 15px;
+        }
+        .input-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #34495e;
+        }
+        .input-group input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccd1d1;
+            border-radius: 6px;
+            font-size: 16px;
+            box-sizing: border-box;
+        }
+        /* 結果卡片 */
+        .result-container {
+            margin-top: 25px;
+            padding-top: 20px;
+            border-top: 2px dashed #eee;
+        }
+        .result-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        .card {
+            flex: 1;
+            margin: 0 5px;
+            padding: 15px 10px;
+            border-radius: 8px;
+            color: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .card h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+        }
+        .card .price {
+            font-size: 24px;
+            font-weight: bold;
+        }
+        .card-cheap { background-color: #27ae60; } /* 綠色 */
+        .card-fair { background-color: #f39c12; }  /* 橘色 */
+        .card-expensive { background-color: #e74c3c; } /* 紅色 */
+        
+        .dividend-highlight {
+            text-align: center;
+            font-size: 18px;
+            font-weight: bold;
+            color: #2980b9;
+            background: #eaf2f8;
+            padding: 10px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>📈 台股殖利率估價計算機</h2>
+    
+    <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('etf')">ETF 估價</button>
+        <button class="tab-btn" onclick="switchTab('stock')">個股估價</button>
+    </div>
+
+    <!-- ETF 計算區塊 -->
+    <div id="tab-etf" class="tab-content active">
+        <div class="input-group">
+            <label>近四季累計配息總額 (元):</label>
+            <input type="number" id="etf-div" value="2.40" step="0.01" oninput="calculateETF()">
+        </div>
+        <div style="display: flex; gap: 10px;">
+            <div class="input-group" style="flex: 1;">
+                <label>便宜殖利率(%):</label>
+                <input type="number" id="etf-yield-cheap" value="10" step="0.1" oninput="calculateETF()">
+            </div>
+            <div class="input-group" style="flex: 1;">
+                <label>合理殖利率(%):</label>
+                <input type="number" id="etf-yield-fair" value="8" step="0.1" oninput="calculateETF()">
+            </div>
+            <div class="input-group" style="flex: 1;">
+                <label>昂貴殖利率(%):</label>
+                <input type="number" id="etf-yield-exp" value="6" step="0.1" oninput="calculateETF()">
+            </div>
+        </div>
+
+        <div class="result-container">
+            <div class="result-row">
+                <div class="card card-cheap">
+                    <h4>便宜價 (買進)</h4>
+                    <div class="price" id="etf-price-cheap">--</div>
+                </div>
+                <div class="card card-fair">
+                    <h4>合理價 (持有)</h4>
+                    <div class="price" id="etf-price-fair">--</div>
+                </div>
+                <div class="card card-expensive">
+                    <h4>昂貴價 (停利)</h4>
+                    <div class="price" id="etf-price-exp">--</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 個股計算區塊 -->
+    <div id="tab-stock" class="tab-content">
+        <div style="display: flex; gap: 10px;">
+            <div class="input-group" style="flex: 1;">
+                <label>預估今年 EPS (元):</label>
+                <input type="number" id="stock-eps" value="5.0" step="0.1" oninput="calculateStock()">
+            </div>
+            <div class="input-group" style="flex: 1;">
+                <label>預估配息率 (%):</label>
+                <input type="number" id="stock-payout" value="80" step="1" oninput="calculateStock()">
+            </div>
+        </div>
+        
+        <div class="dividend-highlight">
+            預估將發放股息：<span id="stock-expected-div">4.00</span> 元
+        </div>
+
+        <div style="display: flex; gap: 10px;">
+            <div class="input-group" style="flex: 1;">
+                <label>便宜殖利率(%):</label>
+                <input type="number" id="stock-yield-cheap" value="7" step="0.1" oninput="calculateStock()">
+            </div>
+            <div class="input-group" style="flex: 1;">
+                <label>合理殖利率(%):</label>
+                <input type="number" id="stock-yield-fair" value="5.5" step="0.1" oninput="calculateStock()">
+            </div>
+            <div class="input-group" style="flex: 1;">
+                <label>昂貴殖利率(%):</label>
+                <input type="number" id="stock-yield-exp" value="4" step="0.1" oninput="calculateStock()">
+            </div>
+        </div>
+
+        <div class="result-container">
+            <div class="result-row">
+                <div class="card card-cheap">
+                    <h4>便宜價 (買進)</h4>
+                    <div class="price" id="stock-price-cheap">--</div>
+                </div>
+                <div class="card card-fair">
+                    <h4>合理價 (持有)</h4>
+                    <div class="price" id="stock-price-fair">--</div>
+                </div>
+                <div class="card card-expensive">
+                    <h4>昂貴價 (停利)</h4>
+                    <div class="price" id="stock-price-exp">--</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<script>
+    // 切換頁籤邏輯
+    function switchTab(tabId) {
+        document.querySelectorAll('.tab-content').forEach(tab => tab.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(btn => btn.classList.remove('active'));
+        
+        document.getElementById('tab-' + tabId).classList.add('active');
+        event.currentTarget.classList.add('active');
+    }
+
+    // ETF 計算邏輯
+    function calculateETF() {
+        const div = parseFloat(document.getElementById('etf-div').value) || 0;
+        const yieldCheap = parseFloat(document.getElementById('etf-yield-cheap').value) || 1;
+        const yieldFair = parseFloat(document.getElementById('etf-yield-fair').value) || 1;
+        const yieldExp = parseFloat(document.getElementById('etf-yield-exp').value) || 1;
+
+        document.getElementById('etf-price-cheap').innerText = (div / (yieldCheap / 100)).toFixed(2);
+        document.getElementById('etf-price-fair').innerText = (div / (yieldFair / 100)).toFixed(2);
+        document.getElementById('etf-price-exp').innerText = (div / (yieldExp / 100)).toFixed(2);
+    }
+
+    // 個股計算邏輯
+    function calculateStock() {
+        const eps = parseFloat(document.getElementById('stock-eps').value) || 0;
+        const payout = parseFloat(document.getElementById('stock-payout').value) || 0;
+        
+        // 算出預估股息
+        const expectedDiv = eps * (payout / 100);
+        document.getElementById('stock-expected-div').innerText = expectedDiv.toFixed(2);
+
+        const yieldCheap = parseFloat(document.getElementById('stock-yield-cheap').value) || 1;
+        const yieldFair = parseFloat(document.getElementById('stock-yield-fair').value) || 1;
+        const yieldExp = parseFloat(document.getElementById('stock-yield-exp').value) || 1;
+
+        document.getElementById('stock-price-cheap').innerText = (expectedDiv / (yieldCheap / 100)).toFixed(2);
+        document.getElementById('stock-price-fair').innerText = (expectedDiv / (yieldFair / 100)).toFixed(2);
+        document.getElementById('stock-price-exp').innerText = (expectedDiv / (yieldExp / 100)).toFixed(2);
+    }
+
+    // 網頁載入時先執行一次計算填入預設值
+    window.onload = function() {
+        calculateETF();
+        calculateStock();
+    };
+</script>
+
+</body>
+</html>
