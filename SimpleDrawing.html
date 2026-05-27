@@ -2,8 +2,8 @@
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>簡易畫布與股市查詢 (Pro Mobile Canvas)</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>簡易畫布與股市查詢</title>
     <style>
         body {
             font-family: sans-serif;
@@ -82,20 +82,22 @@
         .btn-undo { background-color: #ffc107; border-color: #d39e00; }
         .btn-upload { background-color: #17a2b8; color: white; border-color: #117a8b; }
         .btn-search { background-color: #28a745; color: white; border-color: #1e7e34; }
+        /* 下載按鈕專屬樣式 */
+        .btn-download { background-color: #6f42c1; color: white; border-color: #59339d; }
+        .btn-download:hover { background-color: #59339d; }
 
-        /* 外層容器取消固定比例，改為過渡動畫，方便動態切換直式橫式 */
         #canvas-container {
             position: relative;
             width: 100%;
             max-width: 900px;
-            /* 初始預設比例為 3:2，載入圖片後會由 JavaScript 自動覆寫 */
             aspect-ratio: 3 / 2; 
             border: 2px solid #bdc3c7;
             border-radius: 4px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.1);
             background: #ffffff;
             overflow: hidden;
-            touch-action: none; 
+            /* 🌟 修改點：設定為 pinch-zoom，允許雙指縮放，但禁止單指滾動畫面 */
+            touch-action: pinch-zoom; 
             transition: aspect-ratio 0.3s ease; 
         }
         canvas {
@@ -138,8 +140,8 @@
         <button class="tool-btn active" data-tool="pencil">手繪</button>
         <button class="tool-btn" data-tool="line">直線</button>
         <button class="tool-btn" data-tool="polyline">連續線</button>
-        <button class="tool-btn" data-tool="arrow">單箭頭</button>
-        <button class="tool-btn" data-tool="double-arrow">雙箭頭</button>
+        <button class="tool-btn" data-tool="arrow">單箭</button>
+        <button class="tool-btn" data-tool="double-arrow">雙箭</button>
         <button class="tool-btn" data-tool="rect">矩形</button>
         <button class="tool-btn" data-tool="circle">圓形</button>
         <button class="tool-btn" data-tool="ellipse">橢圓</button>
@@ -175,13 +177,15 @@
         
         <input type="file" id="image-upload" accept="image/*" style="display: none;">
         <button id="btn-upload" class="btn-upload">上傳底圖</button>
+        
+        <button id="btn-download" class="btn-download">💾 下載圖片</button>
 
         <div id="search-container">
-            <input type="text" id="stock-id" placeholder="輸入台股代號或名稱" />
+            <input type="text" id="stock-id" placeholder="輸入台股代號或名稱 (支援 Enter 鍵)" />
             <button id="btn-search" class="btn-search">去 Yahoo 找 K 線圖</button>
         </div>
         
-        <span class="highlight-note">💡 提示：貼上圖片時，畫布會自動適應圖片的長寬比例。</span>
+        <span class="highlight-note">💡 手機專用：單指畫圖，雙指可以放大縮小與移動畫布！</span>
     </div>
 
     <div id="canvas-container">
@@ -205,10 +209,12 @@
             let snapshot;
             let polylineActive = false;
 
+            // 🌟 新增：追蹤目前放在螢幕上的手指數量
+            let activePointers = new Set();
+
             let historyStack = [];
             let historyStep = -1;
 
-            // 🌟 升級版全局復原系統：將「雙層畫布的像素資料」與「畫布尺寸」一起存起來
             const saveState = () => {
                 historyStep++;
                 if (historyStep < historyStack.length) {
@@ -222,20 +228,21 @@
                     drawData: drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height)
                 });
                 
-                // 為了避免同時儲存兩層畫布造成手機記憶體不足，將紀錄上限縮減為 10 步
                 if (historyStack.length > 10) {
                     historyStack.shift();
                     historyStep--;
                 }
             };
             
+            // 由於一開始畫布是透明的，我們先填滿白色背景避免下載時出現去背黑圖
+            bgCtx.fillStyle = '#ffffff';
+            bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
             saveState();
 
             // ==========================================
             // 🌟 工具列事件與鍵盤事件
             // ==========================================
 
-            // 搜尋欄位加入 Enter 鍵監聽
             document.getElementById('stock-id').addEventListener('keypress', (e) => {
                 if (e.key === 'Enter') {
                     e.preventDefault();
@@ -277,39 +284,55 @@
                 }
             });
 
-            // 執行復原動作
             document.getElementById('btn-undo').addEventListener('click', () => {
                 if (historyStep > 0) {
                     historyStep--;
                     const state = historyStack[historyStep];
 
-                    // 1. 先還原兩層畫布的真實尺寸
                     bgCanvas.width = state.width;
                     bgCanvas.height = state.height;
                     drawCanvas.width = state.width;
                     drawCanvas.height = state.height;
                     
-                    // 2. 還原外層容器的比例 (直式或橫式)
                     document.getElementById('canvas-container').style.aspectRatio = `${state.width} / ${state.height}`;
 
-                    // 3. 還原兩層畫布的圖像資料
                     bgCtx.putImageData(state.bgData, 0, 0);
                     drawCtx.putImageData(state.drawData, 0, 0);
                 }
             });
 
-            // 清空全部按鈕：將畫布恢復到預設的 900x600 與 3:2 比例
             document.getElementById('btn-clear').addEventListener('click', () => {
                 bgCanvas.width = 900; bgCanvas.height = 600;
                 drawCanvas.width = 900; drawCanvas.height = 600;
                 document.getElementById('canvas-container').style.aspectRatio = '3 / 2';
                 
-                bgCtx.clearRect(0, 0, 900, 600);
+                // 清空後補上白色底，避免下載變透明
+                bgCtx.fillStyle = '#ffffff';
+                bgCtx.fillRect(0, 0, 900, 600);
                 drawCtx.clearRect(0, 0, 900, 600);
                 historyStack = [];
                 historyStep = -1;
                 saveState();
                 document.getElementById('image-upload').value = '';
+            });
+
+            // 🌟 新增：下載圖片功能
+            document.getElementById('btn-download').addEventListener('click', () => {
+                // 建立一個暫存畫布
+                const tempCanvas = document.createElement('canvas');
+                tempCanvas.width = drawCanvas.width;
+                tempCanvas.height = drawCanvas.height;
+                const tempCtx = tempCanvas.getContext('2d');
+
+                // 依序將底層(K線圖)與上層(畫筆)畫入暫存畫布中
+                tempCtx.drawImage(bgCanvas, 0, 0);
+                tempCtx.drawImage(drawCanvas, 0, 0);
+
+                // 產生下載連結並觸發點擊
+                const link = document.createElement('a');
+                link.download = `股市K線分析_${new Date().getTime()}.png`;
+                link.href = tempCanvas.toDataURL('image/png');
+                link.click();
             });
 
             document.getElementById('btn-search').addEventListener('click', () => {
@@ -325,24 +348,22 @@
                 }
             });
             
-            // 🌟 圖片載入與自適應畫布尺寸核心邏輯
             const renderImageToBackground = (imgSource) => {
                 const img = new Image();
                 img.onload = () => {
-                    // 將雙層畫布的邏輯解析度，完美對齊圖片的真實大小
                     bgCanvas.width = img.width;
                     bgCanvas.height = img.height;
                     drawCanvas.width = img.width;
                     drawCanvas.height = img.height;
 
-                    // 改變容器比例，自動實現直式與橫式的自適應
                     document.getElementById('canvas-container').style.aspectRatio = `${img.width} / ${img.height}`;
 
-                    // 將圖片畫入背景，並清空上層
+                    // 清空背景並畫上傳的圖片
+                    bgCtx.fillStyle = '#ffffff';
+                    bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
                     bgCtx.drawImage(img, 0, 0, img.width, img.height);
                     drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
                     
-                    // 執行存檔 (此舉可讓 Undo 按鈕還原上傳/貼上動作)
                     saveState();
                 };
                 img.src = imgSource;
@@ -374,7 +395,7 @@
             });
 
             // ==========================================
-            // 🌟 畫布繪製與座標邏輯
+            // 🌟 畫布繪製與多點觸控防呆邏輯
             // ==========================================
             
             const getPos = (e) => {
@@ -388,6 +409,14 @@
             };
 
             drawCanvas.addEventListener('pointerdown', (e) => {
+                activePointers.add(e.pointerId); // 記錄放上來的手指
+
+                // 如果螢幕上超過一根手指，立即停止畫畫，讓瀏覽器去處理縮放
+                if (activePointers.size > 1) {
+                    isDrawing = false;
+                    return;
+                }
+
                 const pos = getPos(e);
                 
                 if (tool === 'text') {
@@ -404,7 +433,6 @@
 
                 drawCanvas.setPointerCapture(e.pointerId); 
                 
-                // 確保每次下筆前重置設定 (因畫布縮放會將 ctx 屬性重置為預設值)
                 drawCtx.lineCap = 'round';
                 drawCtx.lineJoin = 'round';
                 drawCtx.lineWidth = currentLineWidth;
@@ -441,7 +469,7 @@
             });
 
             drawCanvas.addEventListener('pointermove', (e) => {
-                if (tool === 'text') return; 
+                if (tool === 'text' || activePointers.size > 1) return; // 雙指縮放時不畫圖
 
                 const pos = getPos(e);
 
@@ -517,16 +545,20 @@
             });
 
             const endDrawing = (e) => {
+                activePointers.delete(e.pointerId); // 清除離開的手指紀錄
+
                 if (tool === 'text') return;
                 
-                drawCanvas.releasePointerCapture(e.pointerId); 
+                try { drawCanvas.releasePointerCapture(e.pointerId); } catch(err) {}
+
                 if (tool !== 'polyline' && isDrawing) {
                     isDrawing = false;
-                    saveState();
+                    saveState(); // 單指畫線結束時進行存檔
                 }
                 drawCtx.globalCompositeOperation = 'source-over';
             };
 
+            // 使用 pointerup 與 pointercancel 來保證手指狀態正確重置
             drawCanvas.addEventListener('pointerup', endDrawing);
             drawCanvas.addEventListener('pointercancel', endDrawing);
 
