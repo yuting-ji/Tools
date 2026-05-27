@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>簡易畫布與股市查詢 (Pro Mobile Canvas)</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 10px;
+            background-color: #f4f6f8;
+        }
+        #toolbar {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .divider {
+            width: 1px;
+            height: 30px;
+            background-color: #ccc;
+            margin: 0 5px;
+        }
+
+        button {
+            padding: 8px 12px;
+            cursor: pointer;
+            background-color: #e9ecef;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        button:hover { background-color: #d3d9df; }
+        
+        .active {
+            background-color: #007bff;
+            color: white;
+            border-color: #0056b3;
+        }
+        
+        #color-palette {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        .color-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.2s;
+            box-sizing: border-box;
+        }
+        .color-swatch:hover { transform: scale(1.1); }
+        .color-swatch.active-color {
+            transform: scale(1.2);
+            border-color: #333;
+            box-shadow: 0 0 5px rgba(0,0,0,0.4);
+        }
+        .color-swatch[data-color="#FFFFFF"] { border: 1px solid #ccc; }
+
+        .width-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            color: #333;
+            font-weight: bold;
+        }
+
+        .btn-end { background-color: #6c757d; color: white; border-color: #5a6268; }
+        .btn-end:hover { background-color: #5a6268; }
+        .btn-undo { background-color: #ffc107; border-color: #d39e00; }
+        .btn-upload { background-color: #17a2b8; color: white; border-color: #117a8b; }
+        .btn-search { background-color: #28a745; color: white; border-color: #1e7e34; }
+
+        /* 外層容器取消固定比例，改為過渡動畫，方便動態切換直式橫式 */
+        #canvas-container {
+            position: relative;
+            width: 100%;
+            max-width: 900px;
+            /* 初始預設比例為 3:2，載入圖片後會由 JavaScript 自動覆寫 */
+            aspect-ratio: 3 / 2; 
+            border: 2px solid #bdc3c7;
+            border-radius: 4px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            background: #ffffff;
+            overflow: hidden;
+            touch-action: none; 
+            transition: aspect-ratio 0.3s ease; 
+        }
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #bg-canvas { z-index: 1; }
+        #draw-canvas { z-index: 2; cursor: crosshair; }
+
+        #search-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            width: 100%;
+            margin-top: 5px;
+        }
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px; 
+        }
+        .highlight-note {
+            color: #d35400;
+            font-weight: bold;
+            font-size: 0.9em;
+            display: block;
+            width: 100%;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <button class="tool-btn active" data-tool="pencil">手繪</button>
+        <button class="tool-btn" data-tool="line">直線</button>
+        <button class="tool-btn" data-tool="polyline">連續線</button>
+        <button class="tool-btn" data-tool="arrow">單箭頭</button>
+        <button class="tool-btn" data-tool="double-arrow">雙箭頭</button>
+        <button class="tool-btn" data-tool="rect">矩形</button>
+        <button class="tool-btn" data-tool="circle">圓形</button>
+        <button class="tool-btn" data-tool="ellipse">橢圓</button>
+        <button class="tool-btn" data-tool="text">文字</button>
+        
+        <div class="divider"></div>
+        
+        <div id="color-palette">
+            <div class="color-swatch active-color" data-color="#FF0000" style="background-color: #FF0000;"></div>
+            <div class="color-swatch" data-color="#FF7F00" style="background-color: #FF7F00;"></div>
+            <div class="color-swatch" data-color="#FFFF00" style="background-color: #FFFF00;"></div>
+            <div class="color-swatch" data-color="#00FF00" style="background-color: #00FF00;"></div>
+            <div class="color-swatch" data-color="#0000FF" style="background-color: #0000FF;"></div>
+            <div class="color-swatch" data-color="#4B0082" style="background-color: #4B0082;"></div>
+            <div class="color-swatch" data-color="#9400D3" style="background-color: #9400D3;"></div>
+            <div class="color-swatch" data-color="#000000" style="background-color: #000000;"></div>
+            <div class="color-swatch" data-color="#FFFFFF" style="background-color: #FFFFFF;"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="width-control">
+            <label for="line-width">粗細:</label>
+            <input type="range" id="line-width" min="1" max="20" value="3" style="width: 80px;">
+        </div>
+
+        <div class="divider"></div>
+
+        <button id="btn-end" class="btn-end">結束連續線</button>
+        <button class="tool-btn" data-tool="eraser">橡皮擦</button>
+        <button id="btn-undo" class="btn-undo">↩ 復原</button>
+        <button id="btn-clear">清空全部</button>
+        
+        <input type="file" id="image-upload" accept="image/*" style="display: none;">
+        <button id="btn-upload" class="btn-upload">上傳底圖</button>
+
+        <div id="search-container">
+            <input type="text" id="stock-id" placeholder="輸入台股代號或名稱" />
+            <button id="btn-search" class="btn-search">去 Yahoo 找 K 線圖</button>
+        </div>
+        
+        <span class="highlight-note">💡 提示：貼上圖片時，畫布會自動適應圖片的長寬比例。</span>
+    </div>
+
+    <div id="canvas-container">
+        <canvas id="bg-canvas" width="900" height="600"></canvas>
+        <canvas id="draw-canvas" width="900" height="600"></canvas>
+    </div>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            
+            const bgCanvas = document.getElementById('bg-canvas');
+            const bgCtx = bgCanvas.getContext('2d');
+            const drawCanvas = document.getElementById('draw-canvas');
+            const drawCtx = drawCanvas.getContext('2d');
+            
+            let isDrawing = false;
+            let tool = 'pencil';
+            let currentColor = '#FF0000'; 
+            let currentLineWidth = 3; 
+            let startX, startY;
+            let snapshot;
+            let polylineActive = false;
+
+            let historyStack = [];
+            let historyStep = -1;
+
+            // 🌟 升級版全局復原系統：將「雙層畫布的像素資料」與「畫布尺寸」一起存起來
+            const saveState = () => {
+                historyStep++;
+                if (historyStep < historyStack.length) {
+                    historyStack.length = historyStep;
+                }
+                
+                historyStack.push({
+                    width: drawCanvas.width,
+                    height: drawCanvas.height,
+                    bgData: bgCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height),
+                    drawData: drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height)
+                });
+                
+                // 為了避免同時儲存兩層畫布造成手機記憶體不足，將紀錄上限縮減為 10 步
+                if (historyStack.length > 10) {
+                    historyStack.shift();
+                    historyStep--;
+                }
+            };
+            
+            saveState();
+
+            // ==========================================
+            // 🌟 工具列事件與鍵盤事件
+            // ==========================================
+
+            // 搜尋欄位加入 Enter 鍵監聽
+            document.getElementById('stock-id').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('btn-search').click();
+                }
+            });
+
+            document.getElementById('line-width').addEventListener('input', (e) => {
+                currentLineWidth = parseInt(e.target.value);
+            });
+
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    tool = e.target.getAttribute('data-tool');
+                    polylineActive = false; 
+                    document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                    e.target.classList.add('active');
+                });
+            });
+
+            document.querySelectorAll('.color-swatch').forEach(swatch => {
+                swatch.addEventListener('click', (e) => {
+                    currentColor = e.target.getAttribute('data-color');
+                    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active-color'));
+                    e.target.classList.add('active-color');
+                    
+                    if(tool === 'eraser') {
+                        tool = 'pencil';
+                        document.querySelectorAll('.tool-btn').forEach(b => b.classList.remove('active'));
+                        document.querySelector('.tool-btn[data-tool="pencil"]').classList.add('active');
+                    }
+                });
+            });
+
+            document.getElementById('btn-end').addEventListener('click', () => {
+                if (tool === 'polyline' && polylineActive) {
+                    polylineActive = false;
+                    if(snapshot) drawCtx.putImageData(snapshot, 0, 0); 
+                }
+            });
+
+            // 執行復原動作
+            document.getElementById('btn-undo').addEventListener('click', () => {
+                if (historyStep > 0) {
+                    historyStep--;
+                    const state = historyStack[historyStep];
+
+                    // 1. 先還原兩層畫布的真實尺寸
+                    bgCanvas.width = state.width;
+                    bgCanvas.height = state.height;
+                    drawCanvas.width = state.width;
+                    drawCanvas.height = state.height;
+                    
+                    // 2. 還原外層容器的比例 (直式或橫式)
+                    document.getElementById('canvas-container').style.aspectRatio = `${state.width} / ${state.height}`;
+
+                    // 3. 還原兩層畫布的圖像資料
+                    bgCtx.putImageData(state.bgData, 0, 0);
+                    drawCtx.putImageData(state.drawData, 0, 0);
+                }
+            });
+
+            // 清空全部按鈕：將畫布恢復到預設的 900x600 與 3:2 比例
+            document.getElementById('btn-clear').addEventListener('click', () => {
+                bgCanvas.width = 900; bgCanvas.height = 600;
+                drawCanvas.width = 900; drawCanvas.height = 600;
+                document.getElementById('canvas-container').style.aspectRatio = '3 / 2';
+                
+                bgCtx.clearRect(0, 0, 900, 600);
+                drawCtx.clearRect(0, 0, 900, 600);
+                historyStack = [];
+                historyStep = -1;
+                saveState();
+                document.getElementById('image-upload').value = '';
+            });
+
+            document.getElementById('btn-search').addEventListener('click', () => {
+                const stockInput = document.getElementById('stock-id').value.trim();
+                if(stockInput) {
+                    const isNumeric = /^\d+$/.test(stockInput);
+                    const url = isNumeric 
+                        ? `https://tw.stock.yahoo.com/quote/${stockInput}/technical-analysis`
+                        : `https://tw.stock.yahoo.com/search?search=${encodeURIComponent(stockInput)}`;
+                    window.open(url, '_blank');
+                } else {
+                    alert('請輸入股票代號或名稱');
+                }
+            });
+            
+            // 🌟 圖片載入與自適應畫布尺寸核心邏輯
+            const renderImageToBackground = (imgSource) => {
+                const img = new Image();
+                img.onload = () => {
+                    // 將雙層畫布的邏輯解析度，完美對齊圖片的真實大小
+                    bgCanvas.width = img.width;
+                    bgCanvas.height = img.height;
+                    drawCanvas.width = img.width;
+                    drawCanvas.height = img.height;
+
+                    // 改變容器比例，自動實現直式與橫式的自適應
+                    document.getElementById('canvas-container').style.aspectRatio = `${img.width} / ${img.height}`;
+
+                    // 將圖片畫入背景，並清空上層
+                    bgCtx.drawImage(img, 0, 0, img.width, img.height);
+                    drawCtx.clearRect(0, 0, drawCanvas.width, drawCanvas.height);
+                    
+                    // 執行存檔 (此舉可讓 Undo 按鈕還原上傳/貼上動作)
+                    saveState();
+                };
+                img.src = imgSource;
+            };
+
+            const fileInput = document.getElementById('image-upload');
+            document.getElementById('btn-upload').addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => renderImageToBackground(event.target.result);
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            window.addEventListener('paste', (e) => {
+                const clipboardData = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+                if (!clipboardData || !clipboardData.items) return;
+                for (let index in clipboardData.items) {
+                    const item = clipboardData.items[index];
+                    if (item.kind === 'file' && item.type.startsWith('image/')) {
+                        const blob = item.getAsFile();
+                        const reader = new FileReader();
+                        reader.onload = (event) => renderImageToBackground(event.target.result);
+                        reader.readAsDataURL(blob);
+                    }
+                }
+            });
+
+            // ==========================================
+            // 🌟 畫布繪製與座標邏輯
+            // ==========================================
+            
+            const getPos = (e) => {
+                const rect = drawCanvas.getBoundingClientRect();
+                const scaleX = drawCanvas.width / rect.width;
+                const scaleY = drawCanvas.height / rect.height;
+                return {
+                    x: (e.clientX - rect.left) * scaleX,
+                    y: (e.clientY - rect.top) * scaleY
+                };
+            };
+
+            drawCanvas.addEventListener('pointerdown', (e) => {
+                const pos = getPos(e);
+                
+                if (tool === 'text') {
+                    const text = prompt("請輸入文字：");
+                    if (text) {
+                        const fontSize = 14 + (currentLineWidth * 3);
+                        drawCtx.font = `bold ${fontSize}px sans-serif`;
+                        drawCtx.fillStyle = currentColor;
+                        drawCtx.fillText(text, pos.x, pos.y);
+                        saveState();
+                    }
+                    return; 
+                }
+
+                drawCanvas.setPointerCapture(e.pointerId); 
+                
+                // 確保每次下筆前重置設定 (因畫布縮放會將 ctx 屬性重置為預設值)
+                drawCtx.lineCap = 'round';
+                drawCtx.lineJoin = 'round';
+                drawCtx.lineWidth = currentLineWidth;
+                drawCtx.strokeStyle = currentColor;
+
+                if (tool === 'polyline') {
+                    if (!polylineActive) {
+                        polylineActive = true;
+                        startX = pos.x;
+                        startY = pos.y;
+                        snapshot = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+                    } else {
+                        drawCtx.beginPath();
+                        drawCtx.moveTo(startX, startY);
+                        drawCtx.lineTo(pos.x, pos.y);
+                        drawCtx.stroke();
+                        startX = pos.x;
+                        startY = pos.y;
+                        saveState();
+                        snapshot = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+                    }
+                    return;
+                }
+
+                isDrawing = true;
+                startX = pos.x;
+                startY = pos.y;
+                snapshot = drawCtx.getImageData(0, 0, drawCanvas.width, drawCanvas.height);
+
+                if (tool === 'pencil' || tool === 'eraser') {
+                    drawCtx.beginPath();
+                    drawCtx.moveTo(startX, startY);
+                }
+            });
+
+            drawCanvas.addEventListener('pointermove', (e) => {
+                if (tool === 'text') return; 
+
+                const pos = getPos(e);
+
+                if (tool === 'polyline' && polylineActive) {
+                    drawCtx.putImageData(snapshot, 0, 0);
+                    drawCtx.beginPath();
+                    drawCtx.globalCompositeOperation = 'source-over';
+                    drawCtx.lineWidth = currentLineWidth;
+                    drawCtx.strokeStyle = currentColor;
+                    drawCtx.moveTo(startX, startY);
+                    drawCtx.lineTo(pos.x, pos.y);
+                    drawCtx.stroke();
+                    return;
+                }
+
+                if (!isDrawing) return;
+
+                if (tool === 'pencil' || tool === 'eraser') {
+                    drawCtx.globalCompositeOperation = tool === 'eraser' ? 'destination-out' : 'source-over';
+                    drawCtx.lineWidth = currentLineWidth;
+                    drawCtx.lineTo(pos.x, pos.y);
+                    drawCtx.stroke();
+                } 
+                else if (['line', 'rect', 'circle', 'ellipse', 'arrow', 'double-arrow'].includes(tool)) {
+                    drawCtx.putImageData(snapshot, 0, 0); 
+                    drawCtx.beginPath();
+                    drawCtx.globalCompositeOperation = 'source-over';
+                    drawCtx.lineWidth = currentLineWidth;
+                    drawCtx.strokeStyle = currentColor;   
+                    
+                    if (tool === 'line') {
+                        drawCtx.moveTo(startX, startY);
+                        drawCtx.lineTo(pos.x, pos.y);
+                    } 
+                    else if (tool === 'rect') {
+                        const width = pos.x - startX;
+                        const height = pos.y - startY;
+                        drawCtx.rect(startX, startY, width, height);
+                    } 
+                    else if (tool === 'circle') {
+                        const radius = Math.sqrt(Math.pow(pos.x - startX, 2) + Math.pow(pos.y - startY, 2));
+                        drawCtx.arc(startX, startY, radius, 0, 2 * Math.PI);
+                    } 
+                    else if (tool === 'ellipse') {
+                        const width = Math.abs(pos.x - startX);
+                        const height = Math.abs(pos.y - startY);
+                        const centerX = startX + (pos.x - startX) / 2;
+                        const centerY = startY + (pos.y - startY) / 2;
+                        drawCtx.ellipse(centerX, centerY, width / 2, height / 2, 0, 0, 2 * Math.PI);
+                    } 
+                    else if (tool === 'arrow' || tool === 'double-arrow') {
+                        const headlen = 15 + (currentLineWidth * 1.5); 
+                        const angle = Math.atan2(pos.y - startY, pos.x - startX);
+                        
+                        drawCtx.moveTo(startX, startY);
+                        drawCtx.lineTo(pos.x, pos.y);
+                        
+                        drawCtx.lineTo(pos.x - headlen * Math.cos(angle - Math.PI / 6), pos.y - headlen * Math.sin(angle - Math.PI / 6));
+                        drawCtx.moveTo(pos.x, pos.y);
+                        drawCtx.lineTo(pos.x - headlen * Math.cos(angle + Math.PI / 6), pos.y - headlen * Math.sin(angle + Math.PI / 6));
+
+                        if (tool === 'double-arrow') {
+                            const revAngle = angle + Math.PI;
+                            drawCtx.moveTo(startX, startY);
+                            drawCtx.lineTo(startX - headlen * Math.cos(revAngle - Math.PI / 6), startY - headlen * Math.sin(revAngle - Math.PI / 6));
+                            drawCtx.moveTo(startX, startY);
+                            drawCtx.lineTo(startX - headlen * Math.cos(revAngle + Math.PI / 6), startY - headlen * Math.sin(revAngle + Math.PI / 6));
+                        }
+                    }
+                    
+                    drawCtx.stroke(); 
+                }
+            });
+
+            const endDrawing = (e) => {
+                if (tool === 'text') return;
+                
+                drawCanvas.releasePointerCapture(e.pointerId); 
+                if (tool !== 'polyline' && isDrawing) {
+                    isDrawing = false;
+                    saveState();
+                }
+                drawCtx.globalCompositeOperation = 'source-over';
+            };
+
+            drawCanvas.addEventListener('pointerup', endDrawing);
+            drawCanvas.addEventListener('pointercancel', endDrawing);
+
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && tool === 'polyline' && polylineActive) {
+                    polylineActive = false;
+                    if(snapshot) drawCtx.putImageData(snapshot, 0, 0); 
+                }
+            });
+
+        });
+    </script>
+</body>
+</html>
