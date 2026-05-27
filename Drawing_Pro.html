@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>畫布與股市查詢工具</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 10px;
+            background-color: #f4f6f8;
+        }
+        #toolbar {
+            margin-bottom: 10px;
+            padding: 10px;
+            background: #ffffff;
+            border-radius: 8px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+            display: flex;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .divider {
+            width: 1px;
+            height: 30px;
+            background-color: #ccc;
+            margin: 0 5px;
+        }
+
+        button {
+            padding: 8px 12px;
+            cursor: pointer;
+            background-color: #e9ecef;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        button:hover { background-color: #d3d9df; }
+        
+        .active {
+            background-color: #007bff;
+            color: white;
+            border-color: #0056b3;
+        }
+
+        .select-active {
+            background-color: #ff9800;
+            color: white;
+            border-color: #e68a00;
+        }
+        
+        #color-palette {
+            display: flex;
+            gap: 5px;
+            align-items: center;
+        }
+        .color-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 2px solid transparent;
+            transition: transform 0.2s;
+            box-sizing: border-box;
+        }
+        .color-swatch:hover { transform: scale(1.1); }
+        .color-swatch.active-color {
+            transform: scale(1.2);
+            border-color: #333;
+            box-shadow: 0 0 5px rgba(0,0,0,0.4);
+        }
+        .color-swatch[data-color="#FFFFFF"] { border: 1px solid #ccc; }
+
+        .width-control, .zoom-control, .font-control {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 14px;
+            color: #333;
+            font-weight: bold;
+        }
+        
+        .zoom-control {
+            background: #f1f3f5;
+            padding: 4px 8px;
+            border-radius: 6px;
+            border: 1px solid #ced4da;
+        }
+
+        .font-control select {
+            padding: 4px;
+            border-radius: 4px;
+            border: 1px solid #ccc;
+            font-size: 14px;
+        }
+
+        .btn-end { background-color: #6c757d; color: white; border-color: #5a6268; }
+        .btn-end:hover { background-color: #5a6268; }
+        .btn-undo { background-color: #ffc107; border-color: #d39e00; font-weight: bold; }
+        .btn-undo:hover { background-color: #e0a800; }
+        .btn-delete { background-color: #dc3545; color: white; border-color: #c82333; }
+        .btn-upload { background-color: #17a2b8; color: white; border-color: #117a8b; }
+        .btn-search { background-color: #28a745; color: white; border-color: #1e7e34; }
+        .btn-download { background-color: #6f42c1; color: white; border-color: #59339d; }
+        .btn-download:hover { background-color: #59339d; }
+
+        #workspace {
+            width: 100%;
+            height: 65vh; 
+            max-height: 800px;
+            overflow: auto; 
+            background-color: #dbe1e8; 
+            border: 2px solid #bdc3c7;
+            border-radius: 4px;
+            text-align: center; 
+            padding: 15px; 
+            box-sizing: border-box;
+            box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
+        }
+
+        #canvas-container {
+            display: inline-block; 
+            position: relative;
+            background: #ffffff;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+            text-align: left;
+            touch-action: none; 
+        }
+
+        #search-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            width: 100%;
+            margin-top: 5px;
+        }
+        input[type="text"] {
+            flex-grow: 1;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 4px;
+            font-size: 16px; 
+        }
+        .highlight-note {
+            color: #d35400;
+            font-weight: bold;
+            font-size: 0.9em;
+            display: block;
+            width: 100%;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="toolbar">
+        <button class="tool-btn select-active" data-tool="select">👆 選取</button>
+        <button class="tool-btn" data-tool="pan">🖐️ 平移</button>
+        <button class="tool-btn" data-tool="pencil">手繪</button>
+        <button class="tool-btn" data-tool="line">直線</button>
+        <button class="tool-btn" data-tool="polyline">連續線</button>
+        <button class="tool-btn" data-tool="arrow">單箭</button>
+        <button class="tool-btn" data-tool="double-arrow">雙箭</button>
+        <button class="tool-btn" data-tool="rect">矩形</button>
+        <button class="tool-btn" data-tool="circle">圓形</button>
+        <button class="tool-btn" data-tool="ellipse">橢圓</button>
+        <button class="tool-btn" data-tool="text">文字</button>
+        
+        <div class="divider"></div>
+        
+        <div id="color-palette">
+            <div class="color-swatch active-color" data-color="#FF0000" style="background-color: #FF0000;"></div>
+            <div class="color-swatch" data-color="#FF7F00" style="background-color: #FF7F00;"></div>
+            <div class="color-swatch" data-color="#FFFF00" style="background-color: #FFFF00;"></div>
+            <div class="color-swatch" data-color="#00FF00" style="background-color: #00FF00;"></div>
+            <div class="color-swatch" data-color="#0000FF" style="background-color: #0000FF;"></div>
+            <div class="color-swatch" data-color="#4B0082" style="background-color: #4B0082;"></div>
+            <div class="color-swatch" data-color="#9400D3" style="background-color: #9400D3;"></div>
+            <div class="color-swatch" data-color="#000000" style="background-color: #000000;"></div>
+            <div class="color-swatch" data-color="#FFFFFF" style="background-color: #FFFFFF;"></div>
+        </div>
+
+        <div class="divider"></div>
+
+        <div class="width-control">
+            <label for="line-width">粗細:</label>
+            <input type="range" id="line-width" min="1" max="20" value="3" style="width: 80px;">
+        </div>
+
+        <div class="font-control">
+            <label for="font-size">字級(Pt):</label>
+            <select id="font-size">
+                <option value="8">8 Pt</option>
+                <option value="9">9 Pt</option>
+                <option value="10">10 Pt</option>
+                <option value="11">11 Pt</option>
+                <option value="12">12 Pt</option>
+                <option value="14">14 Pt</option>
+                <option value="16">16 Pt</option>
+                <option value="18">18 Pt</option>
+                <option value="20">20 Pt</option>
+                <option value="24" selected>24 Pt</option>
+                <option value="28">28 Pt</option>
+                <option value="32">32 Pt</option>
+                <option value="36">36 Pt</option>
+                <option value="48">48 Pt</option>
+                <option value="60">60 Pt</option>
+                <option value="72">72 Pt</option>
+            </select>
+        </div>
+        
+        <div class="zoom-control">
+            <label for="zoom-slider">🔍 縮放:</label>
+            <input type="range" id="zoom-slider" min="50" max="200" step="10" value="100" style="width: 100px;">
+            <span id="zoom-value" style="color: #007bff; min-width: 45px; display: inline-block;">100%</span>
+        </div>
+
+        <div class="divider"></div>
+
+        <button id="btn-end" class="btn-end">結束連線</button>
+        <button id="btn-undo" class="btn-undo">↩ 復原</button>
+        <button id="btn-delete" class="btn-delete">刪除選取</button>
+        <button id="btn-clear">清空全部</button>
+        
+        <input type="file" id="image-upload" accept="image/*" style="display: none;">
+        <button id="btn-upload" class="btn-upload">上傳底圖</button>
+        <button id="btn-download" class="btn-download">💾 下載圖片</button>
+
+        <div id="search-container">
+            <input type="text" id="stock-id" placeholder="輸入台股代號或名稱 (支援 Enter 鍵)" />
+            <button id="btn-search" class="btn-search">去 Yahoo 找 K 線圖</button>
+        </div>
+        
+        <span class="highlight-note">💡 提示：輸入文字前可先調整字級。若要修改既有文字的大小，請切換至「👆 選取」工具點選文字，再調整字級選單。</span>
+    </div>
+
+    <div id="workspace">
+        <div id="canvas-container">
+            <canvas id="main-canvas"></canvas>
+        </div>
+    </div>
+
+    <script>
+        window.addEventListener('DOMContentLoaded', () => {
+            
+            const canvas = new fabric.Canvas('main-canvas', {
+                isDrawingMode: false,
+                backgroundColor: '#ffffff'
+            });
+            
+            let currentTool = 'select';
+            let currentColor = '#FF0000'; 
+            let currentLineWidth = 3; 
+            let currentFontSize = 24; 
+            
+            let baseWidth = 900;
+            let baseHeight = 600;
+            let currentZoom = 1;
+            
+            let isDrawingShape = false;
+            let isDraggingView = false;
+            let startX, startY;
+            let lastClientX, lastClientY;
+            let currentShape = null;
+
+            let isDrawingPolyline = false;
+            let polylinePoints = [];
+
+            let historyStack = [];
+            let historyIndex = -1;
+            let isRespondingToHistory = false;
+
+            // ==========================================
+            // 縮放與畫布尺寸更新邏輯
+            // ==========================================
+            const applyCanvasSize = () => {
+                canvas.setWidth(baseWidth * currentZoom);
+                canvas.setHeight(baseHeight * currentZoom);
+                canvas.setZoom(currentZoom);
+                
+                const container = document.getElementById('canvas-container');
+                container.style.width = `${baseWidth * currentZoom}px`;
+                container.style.height = `${baseHeight * currentZoom}px`;
+            };
+            applyCanvasSize();
+
+            document.getElementById('zoom-slider').addEventListener('input', (e) => {
+                const val = e.target.value;
+                document.getElementById('zoom-value').innerText = `${val}%`;
+                currentZoom = parseInt(val) / 100;
+                applyCanvasSize();
+            });
+
+            // ==========================================
+            // 歷史紀錄核心邏輯 (Undo System)
+            // ==========================================
+            const initHistory = () => {
+                historyStack = [];
+                historyIndex = -1;
+                saveState();
+            };
+
+            const saveState = () => {
+                if (isRespondingToHistory) return;
+                
+                const state = {
+                    baseWidth: baseWidth,
+                    baseHeight: baseHeight,
+                    json: canvas.toJSON(['backgroundImage', 'selectable', 'evented', 'strokeUniform', 'id'])
+                };
+                
+                if (historyIndex < historyStack.length - 1) {
+                    historyStack = historyStack.slice(0, historyIndex + 1);
+                }
+                
+                historyStack.push(state);
+                historyIndex++;
+                
+                if (historyStack.length > 30) {
+                    historyStack.shift();
+                    historyIndex--;
+                }
+            };
+
+            canvas.on('object:added', (e) => {
+                if (e.target && e.target.id === 'temp-polyline') return;
+                saveState();
+            });
+            canvas.on('object:modified', saveState);
+            canvas.on('object:removed', saveState);
+
+            document.getElementById('btn-undo').addEventListener('click', () => {
+                if (historyIndex > 0) {
+                    isRespondingToHistory = true;
+                    historyIndex--;
+                    const state = historyStack[historyIndex];
+                    
+                    baseWidth = state.baseWidth;
+                    baseHeight = state.baseHeight;
+                    applyCanvasSize();
+                    
+                    canvas.loadFromJSON(state.json, () => {
+                        canvas.renderAll();
+                        isRespondingToHistory = false;
+                    });
+                } else {
+                    alert('已經沒有上一個動作可以復原囉！');
+                }
+            });
+
+            window.addEventListener('keydown', (e) => {
+                if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+                    e.preventDefault();
+                    document.getElementById('btn-undo').click();
+                }
+            });
+
+            // ==========================================
+            // 箭頭數學公式
+            // ==========================================
+            const makeArrowPath = (x1, y1, x2, y2, isDouble, lineWidth) => {
+                const headlen = 15 + (lineWidth * 1.5);
+                const angle = Math.atan2(y2 - y1, x2 - x1);
+                
+                let path = `M ${x1} ${y1} L ${x2} ${y2}`;
+                
+                const h1x = x2 - headlen * Math.cos(angle - Math.PI / 6);
+                const h1y = y2 - headlen * Math.sin(angle - Math.PI / 6);
+                const h2x = x2 - headlen * Math.cos(angle + Math.PI / 6);
+                const h2y = y2 - headlen * Math.sin(angle + Math.PI / 6);
+                path += ` L ${h1x} ${h1y} M ${x2} ${y2} L ${h2x} ${h2y}`;
+                
+                if (isDouble) {
+                    const revAngle = angle + Math.PI;
+                    const r1x = x1 - headlen * Math.cos(revAngle - Math.PI / 6);
+                    const r1y = y1 - headlen * Math.sin(revAngle - Math.PI / 6);
+                    const r2x = x1 - headlen * Math.cos(revAngle + Math.PI / 6);
+                    const r2y = y1 - headlen * Math.sin(revAngle + Math.PI / 6);
+                    path += ` M ${x1} ${y1} L ${r1x} ${r1y} M ${x1} ${y1} L ${r2x} ${r2y}`;
+                }
+                return path;
+            };
+
+            // ==========================================
+            // 工具列切換與變更邏輯
+            // ==========================================
+            const setToolMode = (toolName) => {
+                if(isDrawingPolyline) endPolyline();
+
+                currentTool = toolName;
+                canvas.isDrawingMode = (toolName === 'pencil');
+                canvas.selection = (toolName === 'select');
+                
+                canvas.forEachObject(obj => {
+                    obj.selectable = (toolName === 'select');
+                    obj.evented = (toolName === 'select');
+                });
+
+                if (toolName === 'pencil') {
+                    canvas.freeDrawingBrush.color = currentColor;
+                    canvas.freeDrawingBrush.width = currentLineWidth;
+                }
+                
+                if (toolName === 'pan') {
+                    canvas.defaultCursor = 'grab';
+                } else if (toolName === 'select') {
+                    canvas.defaultCursor = 'default';
+                } else {
+                    canvas.defaultCursor = 'crosshair';
+                }
+                
+                canvas.requestRenderAll();
+            };
+
+            initHistory();
+            setToolMode('select');
+
+            document.querySelectorAll('.tool-btn').forEach(btn => {
+                btn.addEventListener('click', (e) => {
+                    document.querySelectorAll('.tool-btn').forEach(b => {
+                        b.classList.remove('active', 'select-active');
+                    });
+                    const tool = e.target.getAttribute('data-tool');
+                    if(tool === 'select') e.target.classList.add('select-active');
+                    else e.target.classList.add('active');
+                    setToolMode(tool);
+                });
+            });
+
+            document.querySelectorAll('.color-swatch').forEach(swatch => {
+                swatch.addEventListener('click', (e) => {
+                    currentColor = e.target.getAttribute('data-color');
+                    document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active-color'));
+                    e.target.classList.add('active-color');
+                    
+                    if(canvas.isDrawingMode) canvas.freeDrawingBrush.color = currentColor;
+
+                    const activeObject = canvas.getActiveObject();
+                    if(activeObject) {
+                        if(activeObject.type === 'i-text' || activeObject.type === 'path') {
+                            activeObject.set('fill', activeObject.type === 'path' ? null : currentColor);
+                            activeObject.set('stroke', currentColor);
+                        } else {
+                            activeObject.set('stroke', currentColor);
+                        }
+                        canvas.requestRenderAll();
+                        saveState();
+                    }
+                });
+            });
+
+            document.getElementById('line-width').addEventListener('input', (e) => {
+                currentLineWidth = parseInt(e.target.value);
+                if(canvas.isDrawingMode) canvas.freeDrawingBrush.width = currentLineWidth;
+            });
+
+            document.getElementById('font-size').addEventListener('change', (e) => {
+                currentFontSize = parseInt(e.target.value);
+                
+                const activeObject = canvas.getActiveObject();
+                if (activeObject && activeObject.type === 'i-text') {
+                    activeObject.set('fontSize', currentFontSize);
+                    canvas.requestRenderAll();
+                    saveState();
+                }
+            });
+
+            canvas.on('selection:created', (e) => {
+                const activeObject = e.selected[0];
+                if (activeObject && activeObject.type === 'i-text') {
+                    document.getElementById('font-size').value = activeObject.fontSize;
+                    currentFontSize = activeObject.fontSize;
+                }
+            });
+            canvas.on('selection:updated', (e) => {
+                const activeObject = e.selected[0];
+                if (activeObject && activeObject.type === 'i-text') {
+                    document.getElementById('font-size').value = activeObject.fontSize;
+                    currentFontSize = activeObject.fontSize;
+                }
+            });
+
+            // ==========================================
+            // 畫布滑鼠繪製與平移核心事件
+            // ==========================================
+            canvas.on('mouse:down', function(o) {
+                if (currentTool === 'pan') {
+                    isDraggingView = true;
+                    const pointer = o.e.touches ? o.e.touches[0] : o.e;
+                    lastClientX = pointer.clientX;
+                    lastClientY = pointer.clientY;
+                    canvas.defaultCursor = 'grabbing';
+                    return;
+                }
+
+                if (currentTool === 'select' || currentTool === 'pencil') return;
+                
+                const pointer = canvas.getPointer(o.e);
+                startX = pointer.x;
+                startY = pointer.y;
+
+                const commonOptions = {
+                    stroke: currentColor, strokeWidth: currentLineWidth, fill: 'transparent',
+                    selectable: false, evented: false, strokeUniform: true,
+                    strokeLineCap: 'round', strokeLineJoin: 'round'
+                };
+
+                if (currentTool === 'polyline') {
+                    if (!isDrawingPolyline) {
+                        isDrawingPolyline = true;
+                        polylinePoints = [{x: pointer.x, y: pointer.y}, {x: pointer.x, y: pointer.y}];
+                        currentShape = new fabric.Polyline(polylinePoints, { ...commonOptions, objectCaching: false, id: 'temp-polyline' });
+                        canvas.add(currentShape);
+                    } else {
+                        polylinePoints.push({x: pointer.x, y: pointer.y});
+                    }
+                    return; 
+                }
+
+                if (currentTool === 'text') {
+                    const text = new fabric.IText('輸入文字 (點兩下修改)', {
+                        left: startX, top: startY, 
+                        fill: currentColor, 
+                        fontSize: currentFontSize,
+                        fontFamily: 'sans-serif', 
+                        selectable: true
+                    });
+                    canvas.add(text);
+                    canvas.setActiveObject(text);
+                    text.enterEditing();
+                    text.selectAll();
+                    document.querySelector('[data-tool="select"]').click();
+                    return;
+                }
+
+                isDrawingShape = true;
+                if (currentTool === 'rect') { currentShape = new fabric.Rect({ left: startX, top: startY, width: 0, height: 0, ...commonOptions }); canvas.add(currentShape); } 
+                else if (currentTool === 'circle') { currentShape = new fabric.Circle({ left: startX, top: startY, radius: 0, ...commonOptions }); canvas.add(currentShape); }
+                else if (currentTool === 'ellipse') { currentShape = new fabric.Ellipse({ left: startX, top: startY, rx: 0, ry: 0, ...commonOptions }); canvas.add(currentShape); }
+                else if (currentTool === 'line') { currentShape = new fabric.Line([startX, startY, startX, startY], commonOptions); canvas.add(currentShape); }
+                else if (currentTool === 'arrow' || currentTool === 'double-arrow') {
+                    const isDouble = currentTool === 'double-arrow';
+                    const pathStr = makeArrowPath(startX, startY, startX, startY, isDouble, currentLineWidth);
+                    currentShape = new fabric.Path(pathStr, commonOptions);
+                    canvas.add(currentShape);
+                }
+            });
+
+            canvas.on('mouse:move', function(o) {
+                if (currentTool === 'pan' && isDraggingView) {
+                    const pointer = o.e.touches ? o.e.touches[0] : o.e;
+                    const deltaX = pointer.clientX - lastClientX;
+                    const deltaY = pointer.clientY - lastClientY;
+                    
+                    const workspace = document.getElementById('workspace');
+                    workspace.scrollLeft -= deltaX;
+                    workspace.scrollTop -= deltaY;
+                    
+                    lastClientX = pointer.clientX;
+                    lastClientY = pointer.clientY;
+                    return;
+                }
+
+                const pointer = canvas.getPointer(o.e);
+
+                if (currentTool === 'polyline' && isDrawingPolyline && currentShape) {
+                    polylinePoints[polylinePoints.length - 1] = {x: pointer.x, y: pointer.y};
+                    currentShape.set({ points: polylinePoints });
+                    currentShape._calcDimensions();
+                    currentShape.setCoords();
+                    canvas.requestRenderAll();
+                    return;
+                }
+
+                if (!isDrawingShape || !currentShape) return;
+                
+                if (currentTool === 'rect') {
+                    currentShape.set({ width: Math.abs(pointer.x - startX), height: Math.abs(pointer.y - startY), left: Math.min(pointer.x, startX), top: Math.min(pointer.y, startY) });
+                } 
+                else if (currentTool === 'circle') {
+                    const radius = Math.sqrt(Math.pow(pointer.x - startX, 2) + Math.pow(pointer.y - startY, 2)) / 2;
+                    currentShape.set({ radius: radius, left: Math.min(pointer.x, startX), top: Math.min(pointer.y, startY) });
+                }
+                else if (currentTool === 'ellipse') {
+                    currentShape.set({ rx: Math.abs(pointer.x - startX) / 2, ry: Math.abs(pointer.y - startY) / 2, left: Math.min(pointer.x, startX), top: Math.min(pointer.y, startY) });
+                }
+                else if (currentTool === 'line') {
+                    currentShape.set({ x2: pointer.x, y2: pointer.y });
+                }
+                else if (currentTool === 'arrow' || currentTool === 'double-arrow') {
+                    canvas.remove(currentShape);
+                    const isDouble = currentTool === 'double-arrow';
+                    const pathStr = makeArrowPath(startX, startY, pointer.x, pointer.y, isDouble, currentLineWidth);
+                    currentShape = new fabric.Path(pathStr, {
+                        stroke: currentColor, strokeWidth: currentLineWidth, fill: 'transparent',
+                        selectable: false, evented: false, strokeUniform: true, strokeLineCap: 'round', strokeLineJoin: 'round'
+                    });
+                    canvas.add(currentShape);
+                }
+                canvas.requestRenderAll();
+            });
+
+            canvas.on('mouse:up', function(o) {
+                if (currentTool === 'pan') {
+                    isDraggingView = false;
+                    canvas.defaultCursor = 'grab';
+                    return;
+                }
+
+                if (currentTool === 'polyline') return; 
+
+                if (isDrawingShape && currentShape) {
+                    isDrawingShape = false;
+                    currentShape.set({ selectable: true, evented: true });
+                    canvas.setActiveObject(currentShape);
+                    currentShape = null;
+                    document.querySelector('[data-tool="select"]').click();
+                }
+            });
+
+            canvas.on('path:created', function(e) {
+                e.path.set({ selectable: true, evented: true, strokeUniform: true });
+            });
+
+            const endPolyline = () => {
+                if (isDrawingPolyline && currentShape) {
+                    isDrawingPolyline = false;
+                    polylinePoints.pop();
+                    canvas.remove(currentShape);
+                    if (polylinePoints.length > 1) {
+                        const finalPolyline = new fabric.Polyline(polylinePoints, {
+                            stroke: currentColor, strokeWidth: currentLineWidth, fill: 'transparent',
+                            selectable: true, evented: true, strokeUniform: true, strokeLineCap: 'round', strokeLineJoin: 'round'
+                        });
+                        canvas.add(finalPolyline);
+                        canvas.setActiveObject(finalPolyline);
+                    }
+                    currentShape = null;
+                    document.querySelector('[data-tool="select"]').click();
+                }
+            };
+
+            document.getElementById('btn-end').addEventListener('click', endPolyline);
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape') endPolyline();
+            });
+
+            // ==========================================
+            // 雜項操作功能 (刪除、清空、下載、上傳)
+            // ==========================================
+            document.getElementById('btn-delete').addEventListener('click', () => {
+                const activeObjects = canvas.getActiveObjects();
+                if (activeObjects.length) {
+                    canvas.discardActiveObject();
+                    activeObjects.forEach(object => canvas.remove(object));
+                } else {
+                    alert('請先使用「👆 選取/編輯」工具點擊想刪除的物件或線條！');
+                }
+            });
+
+            document.getElementById('btn-clear').addEventListener('click', () => {
+                canvas.clear();
+                canvas.backgroundColor = '#ffffff';
+                
+                baseWidth = 900;
+                baseHeight = 600;
+                currentZoom = 1;
+                document.getElementById('zoom-slider').value = 100;
+                document.getElementById('zoom-value').innerText = '100%';
+                
+                applyCanvasSize();
+                initHistory();
+                document.getElementById('image-upload').value = '';
+            });
+
+            window.addEventListener('keydown', (e) => {
+                if (e.key === 'Delete' || e.key === 'Backspace') {
+                    if(canvas.getActiveObject() && canvas.getActiveObject().isEditing) return;
+                    const activeObjects = canvas.getActiveObjects();
+                    if (activeObjects.length) {
+                        e.preventDefault();
+                        canvas.discardActiveObject();
+                        activeObjects.forEach(object => canvas.remove(object));
+                    }
+                }
+            });
+
+            document.getElementById('btn-download').addEventListener('click', () => {
+                const dataURL = canvas.toDataURL({ 
+                    format: 'png', 
+                    quality: 1, 
+                    multiplier: 1 / currentZoom 
+                });
+                const link = document.createElement('a');
+                link.download = `股市K線分析_${new Date().getTime()}.png`;
+                link.href = dataURL;
+                link.click();
+            });
+
+            const handleImage = (imgUrl) => {
+                fabric.Image.fromURL(imgUrl, function(img) {
+                    let targetWidth, targetHeight;
+                    
+                    if (img.width >= img.height) {
+                        targetWidth = 900;
+                        targetHeight = (img.height / img.width) * 900;
+                    } else {
+                        targetHeight = 600;
+                        targetWidth = (img.width / img.height) * 600;
+                    }
+
+                    baseWidth = targetWidth;
+                    baseHeight = targetHeight;
+                    
+                    currentZoom = 1;
+                    document.getElementById('zoom-slider').value = 100;
+                    document.getElementById('zoom-value').innerText = '100%';
+                    
+                    applyCanvasSize();
+
+                    img.set({
+                        scaleX: targetWidth / img.width,
+                        scaleY: targetHeight / img.height
+                    });
+
+                    canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+                    initHistory();
+                });
+            };
+
+            const fileInput = document.getElementById('image-upload');
+            document.getElementById('btn-upload').addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (event) => handleImage(event.target.result);
+                    reader.readAsDataURL(file);
+                }
+            });
+
+            window.addEventListener('paste', (e) => {
+                const clipboardData = e.clipboardData || (e.originalEvent && e.originalEvent.clipboardData);
+                if (!clipboardData || !clipboardData.items) return;
+                for (let index in clipboardData.items) {
+                    const item = clipboardData.items[index];
+                    if (item.kind === 'file' && item.type.startsWith('image/')) {
+                        const blob = item.getAsFile();
+                        const reader = new FileReader();
+                        reader.onload = (event) => handleImage(event.target.result);
+                        reader.readAsDataURL(blob);
+                    }
+                }
+            });
+
+            document.getElementById('btn-search').addEventListener('click', () => {
+                const stockInput = document.getElementById('stock-id').value.trim();
+                if(stockInput) {
+                    const isNumeric = /^\d+$/.test(stockInput);
+                    const url = isNumeric 
+                        ? `https://tw.stock.yahoo.com/quote/${stockInput}/technical-analysis`
+                        : `https://tw.stock.yahoo.com/search?search=${encodeURIComponent(stockInput)}`;
+                    window.open(url, '_blank');
+                } else {
+                    alert('請輸入股票代號或名稱');
+                }
+            });
+
+            document.getElementById('stock-id').addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    document.getElementById('btn-search').click();
+                }
+            });
+        });
+    </script>
+</body>
+</html>
