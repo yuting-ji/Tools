@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>畫布與股市查詢工具</title>
+    <title>小娟的行動畫布與股市查詢 (Pro Mobile Canvas - Ultimate)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
         body {
@@ -235,7 +235,7 @@
             <button id="btn-search" class="btn-search">去 Yahoo 找 K 線圖</button>
         </div>
         
-        <span class="highlight-note">💡 提示：輸入文字前可先調整字級。若要修改既有文字的大小，請切換至「👆 選取」工具點選文字，再調整字級選單。</span>
+        <span class="highlight-note">💡 手機用戶下載提示：點擊「下載圖片」後，在彈出的分享選單選擇「儲存影像」，即可存入相簿。</span>
     </div>
 
     <div id="workspace">
@@ -689,14 +689,35 @@
                 }
             });
 
-            document.getElementById('btn-download').addEventListener('click', () => {
+            // 🌟 最終整合的 Web Share API 下載模式 (支援儲存至 iOS 相簿)
+            document.getElementById('btn-download').addEventListener('click', async () => {
+                const fileName = `股市K線分析_${new Date().getTime()}.png`;
                 const dataURL = canvas.toDataURL({ 
                     format: 'png', 
                     quality: 1, 
                     multiplier: 1 / currentZoom 
                 });
+
+                // 檢查是否支援呼叫原生分享面板
+                if (navigator.canShare && navigator.canShare({ files: [] })) {
+                    try {
+                        const res = await fetch(dataURL);
+                        const blob = await res.blob();
+                        const file = new File([blob], fileName, { type: 'image/png' });
+
+                        await navigator.share({
+                            files: [file],
+                            title: '股市K線分析',
+                        });
+                        return;
+                    } catch (err) {
+                        console.log('使用者取消分享或發生錯誤:', err);
+                    }
+                }
+
+                // 若不支援 Web Share API，退回傳統下載模式
                 const link = document.createElement('a');
-                link.download = `股市K線分析_${new Date().getTime()}.png`;
+                link.download = fileName;
                 link.href = dataURL;
                 link.click();
             });
