@@ -75,7 +75,7 @@
         }
         .color-swatch[data-color="#FFFFFF"] { border: 1px solid #ccc; }
 
-        .width-control, .zoom-control, .font-control {
+        .width-control, .zoom-control, .font-control, .canvas-setup {
             display: flex;
             align-items: center;
             gap: 5px;
@@ -84,14 +84,14 @@
             font-weight: bold;
         }
         
-        .zoom-control {
+        .zoom-control, .canvas-setup {
             background: #f1f3f5;
             padding: 4px 8px;
             border-radius: 6px;
             border: 1px solid #ced4da;
         }
 
-        .font-control select {
+        .font-control select, .canvas-setup select {
             padding: 4px;
             border-radius: 4px;
             border: 1px solid #ccc;
@@ -120,7 +120,6 @@
             padding: 15px; 
             box-sizing: border-box;
             box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
-            /* 針對整個工作區啟用原生觸控優化 */
             touch-action: pan-x pan-y; 
         }
 
@@ -130,7 +129,7 @@
             background: #ffffff;
             box-shadow: 0 4px 12px rgba(0,0,0,0.25);
             text-align: left;
-            touch-action: none; /* 防止單指繪圖時螢幕亂動 */
+            touch-action: none; 
         }
 
         #search-container {
@@ -215,6 +214,23 @@
             </select>
         </div>
         
+        <div class="divider"></div>
+
+        <div class="canvas-setup">
+            <label for="canvas-size">📏 畫布:</label>
+            <select id="canvas-size">
+                <option value="1080" selected>1080px</option>
+                <option value="1440">1440px</option>
+                <option value="2160">2160px</option>
+                <option value="3840">3840px</option>
+                <option value="4096">4096px</option>
+            </select>
+            <select id="canvas-orientation">
+                <option value="landscape" selected>橫式</option>
+                <option value="portrait">直式</option>
+            </select>
+        </div>
+
         <div class="zoom-control">
             <label for="zoom-slider">🔍 縮放:</label>
             <input type="range" id="zoom-slider" min="50" max="200" step="10" value="100" style="width: 100px;">
@@ -237,7 +253,7 @@
             <button id="btn-search" class="btn-search">去 Yahoo 找 K 線圖</button>
         </div>
         
-        <span class="highlight-note">💡 提示：在畫布上可用「雙指捏合」自由縮放與平移</span>
+        <span class="highlight-note">💡 提示：無底圖時採用 3:4 比例。若上傳底圖，短邊將自動貼合圖片比例，防範變形。雙指捏合可自由縮放視角。</span>
     </div>
 
     <div id="workspace">
@@ -259,8 +275,9 @@
             let currentLineWidth = 3; 
             let currentFontSize = 24; 
             
-            let baseWidth = 900;
-            let baseHeight = 600;
+            let currentBgImage = null; // 紀錄當前背景圖片
+            let baseWidth = 1080;
+            let baseHeight = 810;
             let currentZoom = 1;
             
             let isDrawingShape = false;
@@ -277,7 +294,7 @@
             let isRespondingToHistory = false;
 
             // ==========================================
-            // 縮放與畫布尺寸更新邏輯
+            // 🌟 畫布尺寸與方向核心邏輯
             // ==========================================
             const applyCanvasSize = () => {
                 canvas.setWidth(baseWidth * currentZoom);
@@ -288,7 +305,61 @@
                 container.style.width = `${baseWidth * currentZoom}px`;
                 container.style.height = `${baseHeight * currentZoom}px`;
             };
-            applyCanvasSize();
+
+            const updateBaseDimensions = (longEdge, orientation, img) => {
+                if (img) {
+                    // 若有底圖，由圖片比例強制作為主導，並自動修正介面的直橫式選項
+                    if (img.width >= img.height) {
+                        baseWidth = longEdge;
+                        baseHeight = longEdge * (img.height / img.width);
+                        document.getElementById('canvas-orientation').value = 'landscape';
+                    } else {
+                        baseHeight = longEdge;
+                        baseWidth = longEdge * (img.width / img.height);
+                        document.getElementById('canvas-orientation').value = 'portrait';
+                    }
+                } else {
+                    // 無底圖時嚴格遵守 3:4 (或 4:3) 的比例
+                    const shortEdge = longEdge * 0.75;
+                    if (orientation === 'landscape') {
+                        baseWidth = longEdge;
+                        baseHeight = shortEdge;
+                    } else {
+                        baseWidth = shortEdge;
+                        baseHeight = longEdge;
+                    }
+                }
+
+                applyCanvasSize();
+
+                if (img) {
+                    img.set({
+                        scaleX: baseWidth / img.width,
+                        scaleY: baseHeight / img.height
+                    });
+                    canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+                }
+                
+                canvas.requestRenderAll();
+            };
+
+            // 綁定畫布設定變更事件
+            document.getElementById('canvas-size').addEventListener('change', (e) => {
+                const val = parseInt(e.target.value);
+                const orient = document.getElementById('canvas-orientation').value;
+                updateBaseDimensions(val, orient, currentBgImage);
+                saveState();
+            });
+
+            document.getElementById('canvas-orientation').addEventListener('change', (e) => {
+                const val = parseInt(document.getElementById('canvas-size').value);
+                const orient = e.target.value;
+                updateBaseDimensions(val, orient, currentBgImage);
+                saveState();
+            });
+
+            // 初始執行一次畫布設定
+            updateBaseDimensions(1080, 'landscape', null);
 
             document.getElementById('zoom-slider').addEventListener('input', (e) => {
                 const val = e.target.value;
@@ -298,7 +369,7 @@
             });
 
             // ==========================================
-            // 🌟 核心升級：雙指觸控縮放與平移 (Multi-touch Zoom & Pan)
+            // 雙指觸控縮放與平移 (Multi-touch Zoom & Pan)
             // ==========================================
             const workspace = document.getElementById('workspace');
             let initialDistance = 0;
@@ -306,7 +377,6 @@
             let lastCenter = null;
 
             workspace.addEventListener('touchstart', (e) => {
-                // 若偵測到 2 根以上的手指，攔截事件不讓 Fabric 處理
                 if (e.touches.length >= 2) {
                     e.preventDefault(); 
                     e.stopPropagation();
@@ -333,20 +403,18 @@
                     const distance = Math.hypot(dx, dy);
                     
                     let newZoom = initialZoom * (distance / initialDistance);
-                    newZoom = Math.max(0.5, Math.min(newZoom, 2.0)); // 限制在 50% ~ 200%
+                    newZoom = Math.max(0.5, Math.min(newZoom, 2.0)); 
 
                     const newCenter = {
                         x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
                         y: (e.touches[0].clientY + e.touches[1].clientY) / 2
                     };
 
-                    // 當縮放改變時，針對手指的中心點進行焦點縮放計算
                     if (Math.abs(currentZoom - newZoom) > 0.001) {
                         const rect = workspace.getBoundingClientRect();
                         const cx = newCenter.x - rect.left;
                         const cy = newCenter.y - rect.top;
                         
-                        // 計算目前手指焦點在絕對畫布上的座標
                         const absX = cx + workspace.scrollLeft;
                         const absY = cy + workspace.scrollTop;
                         const zoomRatio = newZoom / currentZoom;
@@ -356,12 +424,10 @@
                         document.getElementById('zoom-value').innerText = `${Math.round(currentZoom * 100)}%`;
                         applyCanvasSize();
 
-                        // 偏移補償：維持縮放中心不亂跑
                         workspace.scrollLeft = (absX * zoomRatio) - cx;
                         workspace.scrollTop = (absY * zoomRatio) - cy;
                     }
 
-                    // 處理雙指平移
                     if (lastCenter) {
                         workspace.scrollLeft -= (newCenter.x - lastCenter.x);
                         workspace.scrollTop -= (newCenter.y - lastCenter.y);
@@ -377,7 +443,6 @@
                 }
             }, { capture: true });
             
-            // 順手補上電腦版 Ctrl + 滑鼠滾輪的縮放支援
             workspace.addEventListener('wheel', (e) => {
                 if (e.ctrlKey || e.metaKey) {
                     e.preventDefault();
@@ -453,6 +518,21 @@
                     applyCanvasSize();
                     
                     canvas.loadFromJSON(state.json, () => {
+                        currentBgImage = canvas.backgroundImage || null;
+                        
+                        if (state.baseWidth >= state.baseHeight) {
+                            document.getElementById('canvas-orientation').value = 'landscape';
+                        } else {
+                            document.getElementById('canvas-orientation').value = 'portrait';
+                        }
+                        
+                        const longEdge = Math.max(state.baseWidth, state.baseHeight);
+                        const sizeSelect = document.getElementById('canvas-size');
+                        const options = Array.from(sizeSelect.options).map(o => parseInt(o.value));
+                        if (options.includes(Math.round(longEdge))) {
+                            sizeSelect.value = Math.round(longEdge).toString();
+                        }
+
                         canvas.renderAll();
                         isRespondingToHistory = false;
                     });
@@ -774,9 +854,12 @@
             document.getElementById('btn-clear').addEventListener('click', () => {
                 canvas.clear();
                 canvas.backgroundColor = '#ffffff';
+                currentBgImage = null; // 清除圖片追蹤
                 
-                baseWidth = 900;
-                baseHeight = 600;
+                const longEdge = parseInt(document.getElementById('canvas-size').value);
+                const orientation = document.getElementById('canvas-orientation').value;
+                updateBaseDimensions(longEdge, orientation, null);
+                
                 currentZoom = 1;
                 document.getElementById('zoom-slider').value = 100;
                 document.getElementById('zoom-value').innerText = '100%';
@@ -830,31 +913,17 @@
 
             const handleImage = (imgUrl) => {
                 fabric.Image.fromURL(imgUrl, function(img) {
-                    let targetWidth, targetHeight;
+                    currentBgImage = img;
+                    const longEdge = parseInt(document.getElementById('canvas-size').value);
+                    const orientation = document.getElementById('canvas-orientation').value;
                     
-                    if (img.width >= img.height) {
-                        targetWidth = 900;
-                        targetHeight = (img.height / img.width) * 900;
-                    } else {
-                        targetHeight = 600;
-                        targetWidth = (img.width / img.height) * 600;
-                    }
-
-                    baseWidth = targetWidth;
-                    baseHeight = targetHeight;
+                    updateBaseDimensions(longEdge, orientation, img);
                     
                     currentZoom = 1;
                     document.getElementById('zoom-slider').value = 100;
                     document.getElementById('zoom-value').innerText = '100%';
-                    
                     applyCanvasSize();
-
-                    img.set({
-                        scaleX: targetWidth / img.width,
-                        scaleY: targetHeight / img.height
-                    });
-
-                    canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+                    
                     initHistory();
                 });
             };
