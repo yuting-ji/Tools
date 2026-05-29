@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>畫布功能與股市查詢</title>
+    <title>畫布工具與股市查詢</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
         body {
@@ -97,6 +97,14 @@
             border: 1px solid #ccc;
             font-size: 14px;
         }
+
+        /* 翻轉與鏡像按鈕專用樣式 */
+        .transform-control {
+            display: flex;
+            gap: 5px;
+        }
+        .btn-action { background-color: #f8f9fa; color: #333; border-color: #adb5bd; font-weight: bold;}
+        .btn-action:hover { background-color: #e2e6ea; }
 
         .btn-end { background-color: #6c757d; color: white; border-color: #5a6268; }
         .btn-end:hover { background-color: #5a6268; }
@@ -242,6 +250,18 @@
             </select>
         </div>
 
+        <div class="divider"></div>
+
+        <div class="transform-control">
+            <button class="btn-action" id="btn-rot-left">↺ 左轉</button>
+            <button class="btn-action" id="btn-rot-right">↻ 右轉</button>
+            <button class="btn-action" id="btn-rot-180">🔃 180°</button>
+            <button class="btn-action" id="btn-flip-x">↔️ 水平鏡像</button>
+            <button class="btn-action" id="btn-flip-y">↕️ 垂直鏡像</button>
+        </div>
+
+        <div class="divider"></div>
+
         <div class="zoom-control">
             <label for="zoom-slider">🔍 縮放:</label>
             <input type="range" id="zoom-slider" min="50" max="200" step="10" value="100" style="width: 100px;">
@@ -264,7 +284,7 @@
             <button id="btn-search" class="btn-search">去 Yahoo 找 K 線圖</button>
         </div>
         
-        <span class="highlight-note">💡 提示：雙指捏合可自由縮放視角。</span>
+        <span class="highlight-note">💡 提示：</span>
     </div>
 
     <div id="workspace">
@@ -286,7 +306,7 @@
             let currentLineWidth = 3; 
             let currentFontSize = 24; 
             
-            let currentBgImage = null; // 紀錄當前背景圖片
+            let currentBgImage = null; 
             let baseWidth = 1080;
             let baseHeight = 810;
             let currentZoom = 1;
@@ -305,7 +325,7 @@
             let isRespondingToHistory = false;
 
             // ==========================================
-            // 🌟 畫布尺寸與自定義比例核心邏輯
+            // 畫布尺寸與自定義比例核心邏輯
             // ==========================================
             const applyCanvasSize = () => {
                 canvas.setWidth(baseWidth * currentZoom);
@@ -325,21 +345,22 @@
                 const longEdge = parseInt(sizeSelect.value);
                 let activeRatio;
 
-                // 決定實際使用的比例，並可能因底圖自動修改方向
                 if (ratioSelect.value === 'auto') {
                     if (img) {
-                        // 依圖片原比例
-                        activeRatio = Math.max(img.width, img.height) / Math.min(img.width, img.height);
-                        orientSelect.value = img.width >= img.height ? 'landscape' : 'portrait';
+                        // 🌟 若圖片被旋轉過，其視覺的長寬將會互換，需做防護判定
+                        let isRotated90 = Math.abs((img.angle || 0) % 180) === 90;
+                        let visualW = isRotated90 ? img.height : img.width;
+                        let visualH = isRotated90 ? img.width : img.height;
+
+                        activeRatio = Math.max(visualW, visualH) / Math.min(visualW, visualH);
+                        orientSelect.value = visualW >= visualH ? 'landscape' : 'portrait';
                     } else {
-                        // 預設空白畫布為 4:3
                         activeRatio = 4 / 3;
                     }
                 } else {
                     activeRatio = parseFloat(ratioSelect.value);
                 }
 
-                // 計算基礎長寬
                 if (orientSelect.value === 'landscape') {
                     baseWidth = longEdge;
                     baseHeight = longEdge / activeRatio;
@@ -350,9 +371,13 @@
 
                 applyCanvasSize();
 
-                // 處理底圖的防變形縮放與置中對齊
                 if (img) {
-                    const scale = Math.min(baseWidth / img.width, baseHeight / img.height);
+                    let isRotated90 = Math.abs((img.angle || 0) % 180) === 90;
+                    let visualW = isRotated90 ? img.height : img.width;
+                    let visualH = isRotated90 ? img.width : img.height;
+
+                    const scale = Math.min(baseWidth / visualW, baseHeight / visualH);
+                    
                     img.set({
                         scaleX: scale,
                         scaleY: scale,
@@ -368,6 +393,81 @@
                 
                 canvas.requestRenderAll();
             };
+
+            // ==========================================
+            // 🌟 核心引擎：全局翻轉與鏡像轉換演算法 (Global Transform Engine)
+            // ==========================================
+            const transformCanvas = (action) => {
+                const cx = baseWidth / 2;
+                const cy = baseHeight / 2;
+
+                let is90 = action === 'rot90' || action === 'rot-90';
+
+                // 處理畫布邊長對調
+                if (is90) {
+                    let temp = baseWidth;
+                    baseWidth = baseHeight;
+                    baseHeight = temp;
+                }
+
+                const ncx = baseWidth / 2;
+                const ncy = baseHeight / 2;
+
+                // 收集包含底圖在內的所有可見物件
+                const objs = canvas.getObjects();
+                const itemsToTransform = [...objs];
+                if (currentBgImage) itemsToTransform.push(currentBgImage);
+
+                itemsToTransform.forEach(obj => {
+                    // 以物件的「視覺中心點」為準來計算轉換距離
+                    let objCenter = obj.getCenterPoint();
+                    let dx = objCenter.x - cx;
+                    let dy = objCenter.y - cy;
+                    let ndx = dx, ndy = dy;
+
+                    if (action === 'rot90') {
+                        ndx = -dy; ndy = dx;
+                        obj.set('angle', ((obj.angle || 0) + 90) % 360);
+                    } else if (action === 'rot-90') {
+                        ndx = dy; ndy = -dx;
+                        obj.set('angle', ((obj.angle || 0) - 90) % 360);
+                    } else if (action === 'rot180') {
+                        ndx = -dx; ndy = -dy;
+                        obj.set('angle', ((obj.angle || 0) + 180) % 360);
+                    } else if (action === 'flipX') {
+                        ndx = -dx;
+                        obj.set('flipX', !obj.flipX);
+                        obj.set('angle', -(obj.angle || 0)); // 水平鏡像時，旋轉角度必須取負值
+                    } else if (action === 'flipY') {
+                        ndy = -dy;
+                        obj.set('flipY', !obj.flipY);
+                        obj.set('angle', -(obj.angle || 0)); // 垂直鏡像時，旋轉角度必須取負值
+                    }
+
+                    // 重新指派計算後的新絕對座標
+                    let newCenter = new fabric.Point(ncx + ndx, ncy + ndy);
+                    obj.setPositionByOrigin(newCenter, 'center', 'center');
+                    obj.setCoords(); // 強制更新選取框位置
+                });
+
+                // 同步更新介面上的直橫式下拉選單
+                if (is90) {
+                    const orientSelect = document.getElementById('canvas-orientation');
+                    orientSelect.value = (baseWidth >= baseHeight) ? 'landscape' : 'portrait';
+                }
+
+                applyCanvasSize();
+                canvas.requestRenderAll();
+                saveState(); // 轉換完成後自動存入歷史紀錄支援復原
+            };
+
+            // 綁定翻轉按鈕事件
+            document.getElementById('btn-rot-left').addEventListener('click', () => transformCanvas('rot-90'));
+            document.getElementById('btn-rot-right').addEventListener('click', () => transformCanvas('rot90'));
+            document.getElementById('btn-rot-180').addEventListener('click', () => transformCanvas('rot180'));
+            document.getElementById('btn-flip-x').addEventListener('click', () => transformCanvas('flipX'));
+            document.getElementById('btn-flip-y').addEventListener('click', () => transformCanvas('flipY'));
+
 
             // 綁定畫布設定變更事件
             document.getElementById('canvas-size').addEventListener('change', () => {
@@ -547,7 +647,6 @@
                     canvas.loadFromJSON(state.json, () => {
                         currentBgImage = canvas.backgroundImage || null;
                         
-                        // 同步還原 UI 介面選項
                         if (state.baseWidth >= state.baseHeight) {
                             document.getElementById('canvas-orientation').value = 'landscape';
                         } else {
@@ -561,7 +660,6 @@
                             sizeSelect.value = Math.round(longEdge).toString();
                         }
                         
-                        // 復原時為避免比例衝突，自動轉為預設選項
                         document.getElementById('canvas-ratio').value = 'auto';
 
                         canvas.renderAll();
@@ -945,7 +1043,6 @@
                 fabric.Image.fromURL(imgUrl, function(img) {
                     currentBgImage = img;
                     
-                    // 上傳新圖時，強制切換回自動適應比例，確保最佳視覺體驗
                     document.getElementById('canvas-ratio').value = 'auto';
                     updateBaseDimensions(img);
                     
