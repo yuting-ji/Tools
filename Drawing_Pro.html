@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>小娟的行動畫布與股市查詢 (Pro Mobile Canvas - Aspect Ratio Update)</title>
+    <title>畫布功能與股市查詢</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
         body {
@@ -264,7 +264,7 @@
             <button id="btn-search" class="btn-search">去 Yahoo 找 K 線圖</button>
         </div>
         
-        <span class="highlight-note">💡 提示：若強制調整有底圖的畫布比例，圖片會自動置中縮放防變形。雙指捏合可自由縮放視角。</span>
+        <span class="highlight-note">💡 提示：雙指捏合可自由縮放視角。</span>
     </div>
 
     <div id="workspace">
@@ -912,7 +912,7 @@
             });
 
             document.getElementById('btn-download').addEventListener('click', async () => {
-                const fileName = `股市K線分析_${new Date().getTime()}.png`;
+                const fileName = `IMG_${new Date().getTime()}.png`;
                 const dataURL = canvas.toDataURL({ 
                     format: 'png', 
                     quality: 1, 
