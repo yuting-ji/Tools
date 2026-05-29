@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>畫布與股市查詢</title>
+    <title>小娟的行動畫布與股市查詢 (Pro Mobile Canvas - Aspect Ratio Update)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
         body {
@@ -225,6 +225,17 @@
                 <option value="3840">3840px</option>
                 <option value="4096">4096px</option>
             </select>
+            <select id="canvas-ratio">
+                <option value="auto" selected>依圖片 / 4:3</option>
+                <option value="1">1:1</option>
+                <option value="1.5">3:2</option>
+                <option value="1.33333333">4:3</option>
+                <option value="1.4">5:7 (7:5)</option>
+                <option value="1.77777778">16:9</option>
+                <option value="1.6">16:10</option>
+                <option value="2.33333333">21:9</option>
+                <option value="3.55555556">32:9</option>
+            </select>
             <select id="canvas-orientation">
                 <option value="landscape" selected>橫式</option>
                 <option value="portrait">直式</option>
@@ -253,7 +264,7 @@
             <button id="btn-search" class="btn-search">去 Yahoo 找 K 線圖</button>
         </div>
         
-        <span class="highlight-note">💡 提示：無底圖時採用 3:4 比例。若上傳底圖，短邊將自動貼合圖片比例，防範變形。雙指捏合可自由縮放視角。</span>
+        <span class="highlight-note">💡 提示：若強制調整有底圖的畫布比例，圖片會自動置中縮放防變形。雙指捏合可自由縮放視角。</span>
     </div>
 
     <div id="workspace">
@@ -294,7 +305,7 @@
             let isRespondingToHistory = false;
 
             // ==========================================
-            // 🌟 畫布尺寸與方向核心邏輯
+            // 🌟 畫布尺寸與自定義比例核心邏輯
             // ==========================================
             const applyCanvasSize = () => {
                 canvas.setWidth(baseWidth * currentZoom);
@@ -306,60 +317,76 @@
                 container.style.height = `${baseHeight * currentZoom}px`;
             };
 
-            const updateBaseDimensions = (longEdge, orientation, img) => {
-                if (img) {
-                    // 若有底圖，由圖片比例強制作為主導，並自動修正介面的直橫式選項
-                    if (img.width >= img.height) {
-                        baseWidth = longEdge;
-                        baseHeight = longEdge * (img.height / img.width);
-                        document.getElementById('canvas-orientation').value = 'landscape';
+            const updateBaseDimensions = (img) => {
+                const sizeSelect = document.getElementById('canvas-size');
+                const ratioSelect = document.getElementById('canvas-ratio');
+                const orientSelect = document.getElementById('canvas-orientation');
+
+                const longEdge = parseInt(sizeSelect.value);
+                let activeRatio;
+
+                // 決定實際使用的比例，並可能因底圖自動修改方向
+                if (ratioSelect.value === 'auto') {
+                    if (img) {
+                        // 依圖片原比例
+                        activeRatio = Math.max(img.width, img.height) / Math.min(img.width, img.height);
+                        orientSelect.value = img.width >= img.height ? 'landscape' : 'portrait';
                     } else {
-                        baseHeight = longEdge;
-                        baseWidth = longEdge * (img.width / img.height);
-                        document.getElementById('canvas-orientation').value = 'portrait';
+                        // 預設空白畫布為 4:3
+                        activeRatio = 4 / 3;
                     }
                 } else {
-                    // 無底圖時嚴格遵守 3:4 (或 4:3) 的比例
-                    const shortEdge = longEdge * 0.75;
-                    if (orientation === 'landscape') {
-                        baseWidth = longEdge;
-                        baseHeight = shortEdge;
-                    } else {
-                        baseWidth = shortEdge;
-                        baseHeight = longEdge;
-                    }
+                    activeRatio = parseFloat(ratioSelect.value);
+                }
+
+                // 計算基礎長寬
+                if (orientSelect.value === 'landscape') {
+                    baseWidth = longEdge;
+                    baseHeight = longEdge / activeRatio;
+                } else {
+                    baseWidth = longEdge / activeRatio;
+                    baseHeight = longEdge;
                 }
 
                 applyCanvasSize();
 
+                // 處理底圖的防變形縮放與置中對齊
                 if (img) {
+                    const scale = Math.min(baseWidth / img.width, baseHeight / img.height);
                     img.set({
-                        scaleX: baseWidth / img.width,
-                        scaleY: baseHeight / img.height
+                        scaleX: scale,
+                        scaleY: scale,
+                        originX: 'center',
+                        originY: 'center',
+                        left: baseWidth / 2,
+                        top: baseHeight / 2
                     });
                     canvas.setBackgroundImage(img, canvas.renderAll.bind(canvas));
+                } else {
+                    canvas.setBackgroundImage(null, canvas.renderAll.bind(canvas));
                 }
                 
                 canvas.requestRenderAll();
             };
 
             // 綁定畫布設定變更事件
-            document.getElementById('canvas-size').addEventListener('change', (e) => {
-                const val = parseInt(e.target.value);
-                const orient = document.getElementById('canvas-orientation').value;
-                updateBaseDimensions(val, orient, currentBgImage);
+            document.getElementById('canvas-size').addEventListener('change', () => {
+                updateBaseDimensions(currentBgImage);
                 saveState();
             });
 
-            document.getElementById('canvas-orientation').addEventListener('change', (e) => {
-                const val = parseInt(document.getElementById('canvas-size').value);
-                const orient = e.target.value;
-                updateBaseDimensions(val, orient, currentBgImage);
+            document.getElementById('canvas-ratio').addEventListener('change', () => {
+                updateBaseDimensions(currentBgImage);
+                saveState();
+            });
+
+            document.getElementById('canvas-orientation').addEventListener('change', () => {
+                updateBaseDimensions(currentBgImage);
                 saveState();
             });
 
             // 初始執行一次畫布設定
-            updateBaseDimensions(1080, 'landscape', null);
+            updateBaseDimensions(null);
 
             document.getElementById('zoom-slider').addEventListener('input', (e) => {
                 const val = e.target.value;
@@ -520,6 +547,7 @@
                     canvas.loadFromJSON(state.json, () => {
                         currentBgImage = canvas.backgroundImage || null;
                         
+                        // 同步還原 UI 介面選項
                         if (state.baseWidth >= state.baseHeight) {
                             document.getElementById('canvas-orientation').value = 'landscape';
                         } else {
@@ -532,6 +560,9 @@
                         if (options.includes(Math.round(longEdge))) {
                             sizeSelect.value = Math.round(longEdge).toString();
                         }
+                        
+                        // 復原時為避免比例衝突，自動轉為預設選項
+                        document.getElementById('canvas-ratio').value = 'auto';
 
                         canvas.renderAll();
                         isRespondingToHistory = false;
@@ -854,11 +885,10 @@
             document.getElementById('btn-clear').addEventListener('click', () => {
                 canvas.clear();
                 canvas.backgroundColor = '#ffffff';
-                currentBgImage = null; // 清除圖片追蹤
+                currentBgImage = null; 
                 
-                const longEdge = parseInt(document.getElementById('canvas-size').value);
-                const orientation = document.getElementById('canvas-orientation').value;
-                updateBaseDimensions(longEdge, orientation, null);
+                document.getElementById('canvas-ratio').value = 'auto';
+                updateBaseDimensions(null);
                 
                 currentZoom = 1;
                 document.getElementById('zoom-slider').value = 100;
@@ -914,10 +944,10 @@
             const handleImage = (imgUrl) => {
                 fabric.Image.fromURL(imgUrl, function(img) {
                     currentBgImage = img;
-                    const longEdge = parseInt(document.getElementById('canvas-size').value);
-                    const orientation = document.getElementById('canvas-orientation').value;
                     
-                    updateBaseDimensions(longEdge, orientation, img);
+                    // 上傳新圖時，強制切換回自動適應比例，確保最佳視覺體驗
+                    document.getElementById('canvas-ratio').value = 'auto';
+                    updateBaseDimensions(img);
                     
                     currentZoom = 1;
                     document.getElementById('zoom-slider').value = 100;
