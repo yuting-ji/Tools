@@ -170,6 +170,7 @@
         <button class="tool-btn select-active" data-tool="select">👆 選取</button>
         <button class="tool-btn" data-tool="pan">🖐️ 平移</button>
         <button class="tool-btn" data-tool="pencil">手繪</button>
+        <button class="tool-btn" data-tool="fill">🪣 填色</button>
         <button class="tool-btn" data-tool="line">直線</button>
         <button class="tool-btn" data-tool="polyline">連續線</button>
         <button class="tool-btn" data-tool="arrow">單箭</button>
@@ -191,6 +192,9 @@
             <div class="color-swatch" data-color="#9400D3" style="background-color: #9400D3;"></div>
             <div class="color-swatch" data-color="#000000" style="background-color: #000000;"></div>
             <div class="color-swatch" data-color="#FFFFFF" style="background-color: #FFFFFF;"></div>
+            
+            <button id="btn-eyedropper" class="btn-action" style="padding: 2px 6px; margin-left: 5px; border-radius: 4px;" title="吸取顏色">💉</button>
+            <input type="color" id="native-color-picker" style="display: none;">
         </div>
 
         <div class="divider"></div>
@@ -347,7 +351,6 @@
 
                 if (ratioSelect.value === 'auto') {
                     if (img) {
-                        // 🌟 若圖片被旋轉過，其視覺的長寬將會互換，需做防護判定
                         let isRotated90 = Math.abs((img.angle || 0) % 180) === 90;
                         let visualW = isRotated90 ? img.height : img.width;
                         let visualH = isRotated90 ? img.width : img.height;
@@ -403,7 +406,6 @@
 
                 let is90 = action === 'rot90' || action === 'rot-90';
 
-                // 處理畫布邊長對調
                 if (is90) {
                     let temp = baseWidth;
                     baseWidth = baseHeight;
@@ -413,13 +415,11 @@
                 const ncx = baseWidth / 2;
                 const ncy = baseHeight / 2;
 
-                // 收集包含底圖在內的所有可見物件
                 const objs = canvas.getObjects();
                 const itemsToTransform = [...objs];
                 if (currentBgImage) itemsToTransform.push(currentBgImage);
 
                 itemsToTransform.forEach(obj => {
-                    // 以物件的「視覺中心點」為準來計算轉換距離
                     let objCenter = obj.getCenterPoint();
                     let dx = objCenter.x - cx;
                     let dy = objCenter.y - cy;
@@ -437,20 +437,18 @@
                     } else if (action === 'flipX') {
                         ndx = -dx;
                         obj.set('flipX', !obj.flipX);
-                        obj.set('angle', -(obj.angle || 0)); // 水平鏡像時，旋轉角度必須取負值
+                        obj.set('angle', -(obj.angle || 0)); 
                     } else if (action === 'flipY') {
                         ndy = -dy;
                         obj.set('flipY', !obj.flipY);
-                        obj.set('angle', -(obj.angle || 0)); // 垂直鏡像時，旋轉角度必須取負值
+                        obj.set('angle', -(obj.angle || 0)); 
                     }
 
-                    // 重新指派計算後的新絕對座標
                     let newCenter = new fabric.Point(ncx + ndx, ncy + ndy);
                     obj.setPositionByOrigin(newCenter, 'center', 'center');
-                    obj.setCoords(); // 強制更新選取框位置
+                    obj.setCoords(); 
                 });
 
-                // 同步更新介面上的直橫式下拉選單
                 if (is90) {
                     const orientSelect = document.getElementById('canvas-orientation');
                     orientSelect.value = (baseWidth >= baseHeight) ? 'landscape' : 'portrait';
@@ -458,10 +456,9 @@
 
                 applyCanvasSize();
                 canvas.requestRenderAll();
-                saveState(); // 轉換完成後自動存入歷史紀錄支援復原
+                saveState(); 
             };
 
-            // 綁定翻轉按鈕事件
             document.getElementById('btn-rot-left').addEventListener('click', () => transformCanvas('rot-90'));
             document.getElementById('btn-rot-right').addEventListener('click', () => transformCanvas('rot90'));
             document.getElementById('btn-rot-180').addEventListener('click', () => transformCanvas('rot180'));
@@ -485,7 +482,6 @@
                 saveState();
             });
 
-            // 初始執行一次畫布設定
             updateBaseDimensions(null);
 
             document.getElementById('zoom-slider').addEventListener('input', (e) => {
@@ -704,7 +700,7 @@
             };
 
             // ==========================================
-            // 工具列切換與變更邏輯
+            // 工具列切換與變更邏輯 (包含吸管取色)
             // ==========================================
             const setToolMode = (toolName) => {
                 if(isDrawingPolyline) endPolyline();
@@ -715,7 +711,7 @@
                 
                 canvas.forEachObject(obj => {
                     obj.selectable = (toolName === 'select');
-                    obj.evented = (toolName === 'select');
+                    obj.evented = (toolName === 'select' || toolName === 'fill');
                 });
 
                 if (toolName === 'pencil') {
@@ -727,6 +723,8 @@
                     canvas.defaultCursor = 'grab';
                 } else if (toolName === 'select') {
                     canvas.defaultCursor = 'default';
+                } else if (toolName === 'fill') {
+                    canvas.defaultCursor = 'cell'; // 填色工具使用不同的游標
                 } else {
                     canvas.defaultCursor = 'crosshair';
                 }
@@ -749,8 +747,9 @@
                 });
             });
 
-            document.querySelectorAll('.color-swatch').forEach(swatch => {
-                swatch.addEventListener('click', (e) => {
+            // 處理調色盤點擊 (利用事件代理)
+            document.getElementById('color-palette').addEventListener('click', (e) => {
+                if (e.target.classList.contains('color-swatch')) {
                     currentColor = e.target.getAttribute('data-color');
                     document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active-color'));
                     e.target.classList.add('active-color');
@@ -759,8 +758,9 @@
 
                     const activeObject = canvas.getActiveObject();
                     if(activeObject) {
-                        if(activeObject.type === 'i-text' || activeObject.type === 'path') {
-                            activeObject.set('fill', activeObject.type === 'path' ? null : currentColor);
+                        if(activeObject.type === 'i-text') {
+                            activeObject.set('fill', currentColor);
+                        } else if(activeObject.type === 'path') {
                             activeObject.set('stroke', currentColor);
                         } else {
                             activeObject.set('stroke', currentColor);
@@ -768,7 +768,58 @@
                         canvas.requestRenderAll();
                         saveState();
                     }
-                });
+                }
+            });
+
+            // 處理吸管與選色功能
+            const applyPickedColor = (hexColor) => {
+                currentColor = hexColor;
+                document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active-color'));
+                
+                let customSwatch = document.getElementById('custom-swatch');
+                if (!customSwatch) {
+                    customSwatch = document.createElement('div');
+                    customSwatch.id = 'custom-swatch';
+                    customSwatch.className = 'color-swatch active-color';
+                    const palette = document.getElementById('color-palette');
+                    palette.insertBefore(customSwatch, document.getElementById('btn-eyedropper'));
+                }
+                customSwatch.setAttribute('data-color', hexColor);
+                customSwatch.style.backgroundColor = hexColor;
+                customSwatch.classList.add('active-color');
+
+                if(canvas.isDrawingMode) canvas.freeDrawingBrush.color = currentColor;
+
+                const activeObject = canvas.getActiveObject();
+                if(activeObject) {
+                    if(activeObject.type === 'i-text') {
+                        activeObject.set('fill', currentColor);
+                    } else if(activeObject.type === 'path') {
+                        activeObject.set('stroke', currentColor);
+                    } else {
+                        activeObject.set('stroke', currentColor);
+                    }
+                    canvas.requestRenderAll();
+                    saveState();
+                }
+            };
+
+            document.getElementById('btn-eyedropper').addEventListener('click', async () => {
+                if ('EyeDropper' in window) {
+                    try {
+                        const eyeDropper = new EyeDropper();
+                        const result = await eyeDropper.open();
+                        applyPickedColor(result.sRGBHex);
+                    } catch (e) {
+                        console.log('吸管工具已取消');
+                    }
+                } else {
+                    document.getElementById('native-color-picker').click();
+                }
+            });
+
+            document.getElementById('native-color-picker').addEventListener('input', (e) => {
+                applyPickedColor(e.target.value);
             });
 
             document.getElementById('line-width').addEventListener('input', (e) => {
@@ -803,7 +854,7 @@
             });
 
             // ==========================================
-            // 畫布滑鼠繪製與單指平移核心事件
+            // 畫布滑鼠繪製、填色與單指平移核心事件
             // ==========================================
             canvas.on('mouse:down', function(o) {
                 if (currentTool === 'pan') {
@@ -812,6 +863,16 @@
                     lastClientX = pointer.clientX;
                     lastClientY = pointer.clientY;
                     canvas.defaultCursor = 'grabbing';
+                    return;
+                }
+
+                // 填滿圖形邏輯
+                if (currentTool === 'fill') {
+                    if (o.target) {
+                        o.target.set('fill', currentColor);
+                        canvas.requestRenderAll();
+                        saveState();
+                    }
                     return;
                 }
 
