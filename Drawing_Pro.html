@@ -1071,10 +1071,13 @@
             });
 
             document.getElementById('btn-download').addEventListener('click', async () => {
-                const fileName = `IMG_${new Date().getTime()}.png`;
+                // 1. 將預設檔名改為 .jpg
+                const fileName = `IMG_${new Date().getTime()}.jpg`;
+                
+                // 2. 轉換圖片時，將 format 改為 'jpeg'
                 const dataURL = canvas.toDataURL({ 
-                    format: 'png', 
-                    quality: 1, 
+                    format: 'jpeg', 
+                    quality: 1, // JPG 可以調整畫質壓縮率，1 代表 100% 最高畫質，0.8 代表 80%
                     multiplier: 1 / currentZoom 
                 });
 
@@ -1082,11 +1085,13 @@
                     try {
                         const res = await fetch(dataURL);
                         const blob = await res.blob();
-                        const file = new File([blob], fileName, { type: 'image/png' });
+                        
+                        // 3. 將檔案的媒體類型改為 image/jpeg
+                        const file = new File([blob], fileName, { type: 'image/jpeg' });
 
                         await navigator.share({
                             files: [file],
-                            title: '股市K線分析',
+                            title: 'IMG',
                         });
                         return;
                     } catch (err) {
