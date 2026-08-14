@@ -21,6 +21,10 @@
             align-items: center;
             flex-wrap: wrap;
             gap: 8px;
+            /* 讓工具列固定在上方，方便網頁往下拉時還能選工具 */
+            position: sticky;
+            top: 0;
+            z-index: 1000;
         }
         
         .divider {
@@ -98,7 +102,6 @@
             font-size: 14px;
         }
 
-        /* 翻轉與鏡像按鈕專用樣式 */
         .transform-control {
             display: flex;
             gap: 5px;
@@ -118,9 +121,7 @@
 
         #workspace {
             width: 100%;
-            height: 65vh; 
-            max-height: 800px;
-            overflow: auto; 
+            /* 移除了固定高度與 overflow，讓區塊能被畫布撐開 */
             background-color: #dbe1e8; 
             border: 2px solid #bdc3c7;
             border-radius: 4px;
@@ -397,9 +398,6 @@
                 canvas.requestRenderAll();
             };
 
-            // ==========================================
-            // 🌟 核心引擎：全局翻轉與鏡像轉換演算法 (Global Transform Engine)
-            // ==========================================
             const transformCanvas = (action) => {
                 const cx = baseWidth / 2;
                 const cy = baseHeight / 2;
@@ -465,8 +463,6 @@
             document.getElementById('btn-flip-x').addEventListener('click', () => transformCanvas('flipX'));
             document.getElementById('btn-flip-y').addEventListener('click', () => transformCanvas('flipY'));
 
-
-            // 綁定畫布設定變更事件
             document.getElementById('canvas-size').addEventListener('change', () => {
                 updateBaseDimensions(currentBgImage);
                 saveState();
@@ -492,7 +488,7 @@
             });
 
             // ==========================================
-            // 雙指觸控縮放與平移 (Multi-touch Zoom & Pan)
+            // 雙指觸控縮放與平移 (已改為針對整個網頁視窗 window 操作)
             // ==========================================
             const workspace = document.getElementById('workspace');
             let initialDistance = 0;
@@ -534,12 +530,11 @@
                     };
 
                     if (Math.abs(currentZoom - newZoom) > 0.001) {
-                        const rect = workspace.getBoundingClientRect();
-                        const cx = newCenter.x - rect.left;
-                        const cy = newCenter.y - rect.top;
+                        const cx = newCenter.x;
+                        const cy = newCenter.y;
                         
-                        const absX = cx + workspace.scrollLeft;
-                        const absY = cy + workspace.scrollTop;
+                        const absX = cx + window.scrollX;
+                        const absY = cy + window.scrollY;
                         const zoomRatio = newZoom / currentZoom;
 
                         currentZoom = newZoom;
@@ -547,13 +542,11 @@
                         document.getElementById('zoom-value').innerText = `${Math.round(currentZoom * 100)}%`;
                         applyCanvasSize();
 
-                        workspace.scrollLeft = (absX * zoomRatio) - cx;
-                        workspace.scrollTop = (absY * zoomRatio) - cy;
+                        window.scrollTo((absX * zoomRatio) - cx, (absY * zoomRatio) - cy);
                     }
 
                     if (lastCenter) {
-                        workspace.scrollLeft -= (newCenter.x - lastCenter.x);
-                        workspace.scrollTop -= (newCenter.y - lastCenter.y);
+                        window.scrollBy(-(newCenter.x - lastCenter.x), -(newCenter.y - lastCenter.y));
                     }
                     
                     lastCenter = newCenter;
@@ -574,11 +567,11 @@
                     newZoom = Math.max(0.5, Math.min(newZoom, 2.0));
                     
                     if (newZoom !== currentZoom) {
-                        const rect = workspace.getBoundingClientRect();
-                        const cx = e.clientX - rect.left;
-                        const cy = e.clientY - rect.top;
-                        const absX = cx + workspace.scrollLeft;
-                        const absY = cy + workspace.scrollTop;
+                        const cx = e.clientX;
+                        const cy = e.clientY;
+                        
+                        const absX = cx + window.scrollX;
+                        const absY = cy + window.scrollY;
                         const zoomRatio = newZoom / currentZoom;
                         
                         currentZoom = newZoom;
@@ -586,8 +579,7 @@
                         document.getElementById('zoom-value').innerText = `${Math.round(currentZoom * 100)}%`;
                         applyCanvasSize();
                         
-                        workspace.scrollLeft = (absX * zoomRatio) - cx;
-                        workspace.scrollTop = (absY * zoomRatio) - cy;
+                        window.scrollTo((absX * zoomRatio) - cx, (absY * zoomRatio) - cy);
                     }
                 }
             }, { passive: false });
@@ -673,9 +665,6 @@
                 }
             });
 
-            // ==========================================
-            // 箭頭數學公式
-            // ==========================================
             const makeArrowPath = (x1, y1, x2, y2, isDouble, lineWidth) => {
                 const headlen = 15 + (lineWidth * 1.5);
                 const angle = Math.atan2(y2 - y1, x2 - x1);
@@ -699,9 +688,6 @@
                 return path;
             };
 
-            // ==========================================
-            // 工具列切換與變更邏輯 (包含吸管取色)
-            // ==========================================
             const setToolMode = (toolName) => {
                 if(isDrawingPolyline) endPolyline();
 
@@ -724,7 +710,7 @@
                 } else if (toolName === 'select') {
                     canvas.defaultCursor = 'default';
                 } else if (toolName === 'fill') {
-                    canvas.defaultCursor = 'cell'; // 填色工具使用不同的游標
+                    canvas.defaultCursor = 'cell';
                 } else {
                     canvas.defaultCursor = 'crosshair';
                 }
@@ -747,7 +733,6 @@
                 });
             });
 
-            // 處理調色盤點擊 (利用事件代理)
             document.getElementById('color-palette').addEventListener('click', (e) => {
                 if (e.target.classList.contains('color-swatch')) {
                     currentColor = e.target.getAttribute('data-color');
@@ -771,7 +756,6 @@
                 }
             });
 
-            // 處理吸管與選色功能
             const applyPickedColor = (hexColor) => {
                 currentColor = hexColor;
                 document.querySelectorAll('.color-swatch').forEach(s => s.classList.remove('active-color'));
@@ -866,7 +850,6 @@
                     return;
                 }
 
-                // 填滿圖形邏輯
                 if (currentTool === 'fill') {
                     if (o.target) {
                         o.target.set('fill', currentColor);
@@ -930,14 +913,13 @@
             });
 
             canvas.on('mouse:move', function(o) {
+                // 平移功能 (已改為針對整個網頁 window 捲動)
                 if (currentTool === 'pan' && isDraggingView) {
                     const pointer = o.e.touches ? o.e.touches[0] : o.e;
                     const deltaX = pointer.clientX - lastClientX;
                     const deltaY = pointer.clientY - lastClientY;
                     
-                    const workspace = document.getElementById('workspace');
-                    workspace.scrollLeft -= deltaX;
-                    workspace.scrollTop -= deltaY;
+                    window.scrollBy(-deltaX, -deltaY);
                     
                     lastClientX = pointer.clientX;
                     lastClientY = pointer.clientY;
@@ -1028,9 +1010,6 @@
                 if (e.key === 'Escape') endPolyline();
             });
 
-            // ==========================================
-            // 雜項操作功能 (刪除、清空、下載、上傳)
-            // ==========================================
             document.getElementById('btn-delete').addEventListener('click', () => {
                 const activeObjects = canvas.getActiveObjects();
                 if (activeObjects.length) {
@@ -1070,14 +1049,12 @@
                 }
             });
 
+            // 下載功能 (已改為匯出 JPG 格式)
             document.getElementById('btn-download').addEventListener('click', async () => {
-                // 1. 將預設檔名改為 .jpg
                 const fileName = `IMG_${new Date().getTime()}.jpg`;
-                
-                // 2. 轉換圖片時，將 format 改為 'jpeg'
                 const dataURL = canvas.toDataURL({ 
                     format: 'jpeg', 
-                    quality: 1, // JPG 可以調整畫質壓縮率，1 代表 100% 最高畫質，0.8 代表 80%
+                    quality: 1, 
                     multiplier: 1 / currentZoom 
                 });
 
@@ -1085,13 +1062,11 @@
                     try {
                         const res = await fetch(dataURL);
                         const blob = await res.blob();
-                        
-                        // 3. 將檔案的媒體類型改為 image/jpeg
                         const file = new File([blob], fileName, { type: 'image/jpeg' });
 
                         await navigator.share({
                             files: [file],
-                            title: 'IMG',
+                            title: '股市K線分析',
                         });
                         return;
                     } catch (err) {
