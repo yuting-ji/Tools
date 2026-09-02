@@ -11,7 +11,6 @@
             margin: 0;
             padding: 8px;
             background-color: #f4f6f8;
-            /* 防止手機長按選取網頁元素 */
             -webkit-user-select: none;
             user-select: none;
         }
@@ -24,7 +23,6 @@
             box-shadow: 0 2px 6px rgba(0,0,0,0.1);
             display: flex;
             align-items: center;
-            /* 針對手機：改為不換行，允許橫向滑動 */
             flex-wrap: nowrap;
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
@@ -34,7 +32,6 @@
             z-index: 1000;
         }
 
-        /* 自訂橫向滾動條樣式，讓它在手機上看起來比較精緻 */
         #toolbar::-webkit-scrollbar {
             height: 6px;
         }
@@ -51,7 +48,6 @@
         }
 
         button {
-            /* 針對手機：加大按鈕觸控範圍與字體 */
             padding: 10px 16px;
             cursor: pointer;
             background-color: #e9ecef;
@@ -81,7 +77,6 @@
             align-items: center;
         }
         .color-swatch {
-            /* 針對手機：將色塊加大，方便手指點擊 */
             width: 36px;
             height: 36px;
             border-radius: 50%;
@@ -118,11 +113,10 @@
             padding: 8px 4px;
             border-radius: 4px;
             border: 1px solid #ccc;
-            font-size: 16px; /* 16px 避免 iOS Safari 自動放大畫面 */
+            font-size: 16px;
         }
 
         input[type="range"] {
-            /* 針對手機：加長滑桿以增加精準度 */
             width: 100px;
             height: 24px;
         }
@@ -145,9 +139,7 @@
             padding: 10px; 
             box-sizing: border-box;
             box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
-            /* 針對手機：設定嚴格的 touch-action 避免觸發下拉更新 */
-            touch-action: none; 
-            overflow: hidden;
+            /* 解除 overflow: hidden 讓頁面可以自然滾動 */
         }
 
         #canvas-container {
@@ -156,7 +148,7 @@
             background: #ffffff;
             box-shadow: 0 4px 12px rgba(0,0,0,0.25);
             text-align: left;
-            touch-action: none; 
+            touch-action: none; /* 讓在畫布上的觸控專屬於 Fabric.js 處理 */
             transform-origin: top left;
         }
 
@@ -171,7 +163,7 @@
             padding: 10px;
             border: 1px solid #ccc;
             border-radius: 4px;
-            font-size: 16px; /* 16px 避免 iOS Safari 自動放大畫面 */
+            font-size: 16px;
         }
         .highlight-note {
             color: #d35400;
@@ -252,8 +244,8 @@
                 <option value="1.77777778">16:9</option>
             </select>
             <select id="canvas-orientation">
-                <option value="landscape" selected>橫式</option>
-                <option value="portrait">直式</option>
+                <option value="landscape">橫式</option>
+                <option value="portrait" selected>直式</option> <!-- 預設改為直式 -->
             </select>
         </div>
 
@@ -299,7 +291,6 @@
     </div>
 
     <script>
-        // 核心邏輯維持不變，完全兼容原有的繪圖、Undo與匯出功能
         window.addEventListener('DOMContentLoaded', () => {
             const canvas = new fabric.Canvas('main-canvas', {
                 isDrawingMode: false,
@@ -328,6 +319,13 @@
             let historyStack = [];
             let historyIndex = -1;
             let isRespondingToHistory = false;
+
+            // 確保手機端與電腦端都能正確抓取座標的輔助函數
+            const getPointerPos = (e) => {
+                if (e.touches && e.touches.length > 0) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
+                if (e.changedTouches && e.changedTouches.length > 0) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
+                return { x: e.clientX, y: e.clientY };
+            };
 
             const applyCanvasSize = () => {
                 canvas.setWidth(baseWidth * currentZoom);
@@ -462,7 +460,7 @@
                 applyCanvasSize();
             });
 
-            // 觸控雙指縮放與平移
+            // 觸控雙指縮放
             const workspace = document.getElementById('workspace');
             let initialDistance = 0;
             let initialZoom = 1;
@@ -620,13 +618,16 @@
             });
 
             canvas.on('mouse:down', function(o) {
+                // 平移工具：捕捉初始座標
                 if (currentTool === 'pan') {
                     isDraggingView = true;
-                    const pointer = o.e.touches ? o.e.touches[0] : o.e;
-                    lastClientX = pointer.clientX; lastClientY = pointer.clientY;
+                    const pos = getPointerPos(o.e);
+                    lastClientX = pos.x;
+                    lastClientY = pos.y;
                     canvas.defaultCursor = 'grabbing';
                     return;
                 }
+                
                 if (currentTool === 'fill') {
                     if (o.target) { o.target.set('fill', currentColor); canvas.requestRenderAll(); saveState(); }
                     return;
@@ -667,10 +668,14 @@
             });
 
             canvas.on('mouse:move', function(o) {
+                // 平移工具：計算移動差值並滾動視窗
                 if (currentTool === 'pan' && isDraggingView) {
-                    const pointer = o.e.touches ? o.e.touches[0] : o.e;
-                    window.scrollBy(-(pointer.clientX - lastClientX), -(pointer.clientY - lastClientY));
-                    lastClientX = pointer.clientX; lastClientY = pointer.clientY;
+                    const pos = getPointerPos(o.e);
+                    const deltaX = pos.x - lastClientX;
+                    const deltaY = pos.y - lastClientY;
+                    window.scrollBy(-deltaX, -deltaY);
+                    lastClientX = pos.x; 
+                    lastClientY = pos.y;
                     return;
                 }
 
