@@ -6,17 +6,23 @@
     <title>畫布工具與股市查詢 (手機優化版)</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
     <style>
-        body {
-            font-family: sans-serif;
+        /* 核心架構修改：讓 body 鎖死，由 workspace 負責滾動 */
+        html, body {
+            height: 100%;
             margin: 0;
-            padding: 8px;
+            padding: 0;
+            overflow: hidden;
             background-color: #f4f6f8;
+            display: flex;
+            flex-direction: column;
             -webkit-user-select: none;
             user-select: none;
+            font-family: sans-serif;
         }
         
         #toolbar {
-            margin-bottom: 10px;
+            flex-shrink: 0;
+            margin: 8px;
             padding: 10px;
             background: #ffffff;
             border-radius: 8px;
@@ -27,99 +33,38 @@
             overflow-x: auto;
             -webkit-overflow-scrolling: touch;
             gap: 10px;
-            position: sticky;
-            top: 0;
-            z-index: 1000;
         }
 
-        #toolbar::-webkit-scrollbar {
-            height: 6px;
-        }
-        #toolbar::-webkit-scrollbar-thumb {
-            background-color: #ccc;
-            border-radius: 4px;
-        }
+        #toolbar::-webkit-scrollbar { height: 6px; }
+        #toolbar::-webkit-scrollbar-thumb { background-color: #ccc; border-radius: 4px; }
         
-        .divider {
-            min-width: 1px;
-            height: 30px;
-            background-color: #ccc;
-            margin: 0 2px;
-        }
+        .divider { min-width: 1px; height: 30px; background-color: #ccc; margin: 0 2px; }
 
         button {
-            padding: 10px 16px;
-            cursor: pointer;
-            background-color: #e9ecef;
-            border: 1px solid #ccc;
-            border-radius: 6px;
-            font-size: 16px;
-            white-space: nowrap;
-            transition: all 0.2s;
+            padding: 10px 16px; cursor: pointer; background-color: #e9ecef;
+            border: 1px solid #ccc; border-radius: 6px; font-size: 16px;
+            white-space: nowrap; transition: all 0.2s;
         }
         button:hover, button:active { background-color: #d3d9df; }
+        .active { background-color: #007bff; color: white; border-color: #0056b3; }
+        .select-active { background-color: #ff9800; color: white; border-color: #e68a00; }
         
-        .active {
-            background-color: #007bff;
-            color: white;
-            border-color: #0056b3;
-        }
-
-        .select-active {
-            background-color: #ff9800;
-            color: white;
-            border-color: #e68a00;
-        }
-        
-        #color-palette {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
+        #color-palette { display: flex; gap: 8px; align-items: center; }
         .color-swatch {
-            width: 36px;
-            height: 36px;
-            border-radius: 50%;
-            cursor: pointer;
-            border: 2px solid transparent;
-            box-sizing: border-box;
-            flex-shrink: 0;
+            width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+            border: 2px solid transparent; box-sizing: border-box; flex-shrink: 0;
         }
-        .color-swatch.active-color {
-            transform: scale(1.1);
-            border-color: #333;
-            box-shadow: 0 0 5px rgba(0,0,0,0.4);
-        }
+        .color-swatch.active-color { transform: scale(1.1); border-color: #333; box-shadow: 0 0 5px rgba(0,0,0,0.4); }
         .color-swatch[data-color="#FFFFFF"] { border: 1px solid #ccc; }
 
         .width-control, .zoom-control, .font-control, .canvas-setup {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-size: 16px;
-            color: #333;
-            font-weight: bold;
-            white-space: nowrap;
+            display: flex; align-items: center; gap: 5px; font-size: 16px;
+            color: #333; font-weight: bold; white-space: nowrap;
         }
         
-        .zoom-control, .canvas-setup {
-            background: #f1f3f5;
-            padding: 6px 10px;
-            border-radius: 6px;
-            border: 1px solid #ced4da;
-        }
-
-        .font-control select, .canvas-setup select {
-            padding: 8px 4px;
-            border-radius: 4px;
-            border: 1px solid #ccc;
-            font-size: 16px;
-        }
-
-        input[type="range"] {
-            width: 100px;
-            height: 24px;
-        }
+        .zoom-control, .canvas-setup { background: #f1f3f5; padding: 6px 10px; border-radius: 6px; border: 1px solid #ced4da; }
+        .font-control select, .canvas-setup select { padding: 8px 4px; border-radius: 4px; border: 1px solid #ccc; font-size: 16px; }
+        input[type="range"] { width: 100px; height: 24px; }
 
         .transform-control { display: flex; gap: 8px; }
         .btn-action { background-color: #f8f9fa; color: #333; border-color: #adb5bd; font-weight: bold;}
@@ -130,16 +75,21 @@
         .btn-search { background-color: #28a745; color: white; border-color: #1e7e34; }
         .btn-download { background-color: #6f42c1; color: white; border-color: #59339d; }
 
+        .highlight-note {
+            flex-shrink: 0; color: #d35400; font-weight: bold; font-size: 0.9em;
+            text-align: center; margin-bottom: 8px;
+        }
+
+        /* 工作區改為佔滿剩餘空間，並擁有獨立的捲軸 */
         #workspace {
-            width: 100%;
+            flex-grow: 1;
             background-color: #dbe1e8; 
-            border: 2px solid #bdc3c7;
-            border-radius: 6px;
-            text-align: center; 
+            border-top: 2px solid #bdc3c7;
             padding: 10px; 
             box-sizing: border-box;
             box-shadow: inset 0 2px 5px rgba(0,0,0,0.1);
-            /* 解除 overflow: hidden 讓頁面可以自然滾動 */
+            overflow: auto; /* 獨立滾動容器 */
+            -webkit-overflow-scrolling: touch;
         }
 
         #canvas-container {
@@ -148,31 +98,12 @@
             background: #ffffff;
             box-shadow: 0 4px 12px rgba(0,0,0,0.25);
             text-align: left;
-            touch-action: none; /* 讓在畫布上的觸控專屬於 Fabric.js 處理 */
+            touch-action: none; 
             transform-origin: top left;
         }
 
-        #search-container {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            margin-left: 5px;
-        }
-        input[type="text"] {
-            width: 140px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            font-size: 16px;
-        }
-        .highlight-note {
-            color: #d35400;
-            font-weight: bold;
-            font-size: 0.9em;
-            display: block;
-            margin-top: 10px;
-            text-align: center;
-        }
+        #search-container { display: flex; align-items: center; gap: 8px; margin-left: 5px; }
+        input[type="text"] { width: 140px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; font-size: 16px; }
     </style>
 </head>
 <body>
@@ -245,7 +176,7 @@
             </select>
             <select id="canvas-orientation">
                 <option value="landscape">橫式</option>
-                <option value="portrait" selected>直式</option> <!-- 預設改為直式 -->
+                <option value="portrait" selected>直式</option> <!-- 預設直式 -->
             </select>
         </div>
 
@@ -282,7 +213,7 @@
         </div>
     </div>
 
-    <span class="highlight-note">💡 提示：工具列可左右滑動。如需平移畫布請點選「🖐️ 平移」工具並使用單指拖曳。</span>
+    <span class="highlight-note">💡 提示：工具列可左右滑動。點選「🖐️ 平移」工具並單指拖曳，或雙指直接縮放。</span>
 
     <div id="workspace">
         <div id="canvas-container">
@@ -320,7 +251,8 @@
             let historyIndex = -1;
             let isRespondingToHistory = false;
 
-            // 確保手機端與電腦端都能正確抓取座標的輔助函數
+            const workspace = document.getElementById('workspace');
+
             const getPointerPos = (e) => {
                 if (e.touches && e.touches.length > 0) return { x: e.touches[0].clientX, y: e.touches[0].clientY };
                 if (e.changedTouches && e.changedTouches.length > 0) return { x: e.changedTouches[0].clientX, y: e.changedTouches[0].clientY };
@@ -460,8 +392,7 @@
                 applyCanvasSize();
             });
 
-            // 觸控雙指縮放
-            const workspace = document.getElementById('workspace');
+            // 觸控雙指縮放與獨立容器平移處理
             let initialDistance = 0;
             let initialZoom = 1;
             let lastCenter = null;
@@ -492,8 +423,11 @@
                     if (Math.abs(currentZoom - newZoom) > 0.001) {
                         const cx = newCenter.x;
                         const cy = newCenter.y;
-                        const absX = cx + window.scrollX;
-                        const absY = cy + window.scrollY;
+                        
+                        const rect = workspace.getBoundingClientRect();
+                        const absX = cx - rect.left + workspace.scrollLeft;
+                        const absY = cy - rect.top + workspace.scrollTop;
+                        
                         const zoomRatio = newZoom / currentZoom;
 
                         currentZoom = newZoom;
@@ -501,11 +435,13 @@
                         document.getElementById('zoom-value').innerText = `${Math.round(currentZoom * 100)}%`;
                         applyCanvasSize();
 
-                        window.scrollTo((absX * zoomRatio) - cx, (absY * zoomRatio) - cy);
+                        workspace.scrollLeft = (absX * zoomRatio) - (cx - rect.left);
+                        workspace.scrollTop = (absY * zoomRatio) - (cy - rect.top);
                     }
 
                     if (lastCenter) {
-                        window.scrollBy(-(newCenter.x - lastCenter.x), -(newCenter.y - lastCenter.y));
+                        workspace.scrollLeft -= (newCenter.x - lastCenter.x);
+                        workspace.scrollTop -= (newCenter.y - lastCenter.y);
                     }
                     lastCenter = newCenter;
                 }
@@ -513,7 +449,6 @@
 
             workspace.addEventListener('touchend', (e) => { if (e.touches.length < 2) lastCenter = null; });
             
-            // Undo 系統
             const initHistory = () => { historyStack = []; historyIndex = -1; saveState(); };
             const saveState = () => {
                 if (isRespondingToHistory) return;
@@ -618,7 +553,7 @@
             });
 
             canvas.on('mouse:down', function(o) {
-                // 平移工具：捕捉初始座標
+                // 平移工具：攔截並記錄初始座標
                 if (currentTool === 'pan') {
                     isDraggingView = true;
                     const pos = getPointerPos(o.e);
@@ -668,12 +603,15 @@
             });
 
             canvas.on('mouse:move', function(o) {
-                // 平移工具：計算移動差值並滾動視窗
+                // 平移工具：精確控制 workspace 容器滾動
                 if (currentTool === 'pan' && isDraggingView) {
                     const pos = getPointerPos(o.e);
                     const deltaX = pos.x - lastClientX;
                     const deltaY = pos.y - lastClientY;
-                    window.scrollBy(-deltaX, -deltaY);
+                    
+                    workspace.scrollLeft -= deltaX;
+                    workspace.scrollTop -= deltaY;
+                    
                     lastClientX = pos.x; 
                     lastClientY = pos.y;
                     return;
